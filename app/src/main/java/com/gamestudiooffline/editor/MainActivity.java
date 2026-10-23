@@ -346,7 +346,7 @@ public class MainActivity extends Activity {
             double ox=o.optDouble("x"),oy=o.optDouble("y"),ow=Math.max(1,o.optDouble("w")),oh=Math.max(1,o.optDouble("h"));
             boolean overlap=runtimePlayerX<ox+ow&&runtimePlayerX+pw>ox&&runtimePlayerY<oy+oh&&runtimePlayerY+ph>oy;
             if(type.equals("platform")&&runtimePlayerVY>=0&&oldBottom<=oy+12&&runtimePlayerY+ph>=oy&&runtimePlayerX+pw>ox&&runtimePlayerX<ox+ow){runtimePlayerY=oy-ph;runtimePlayerVY=0;runtimeGrounded=true;}
-            if(overlap&&(type.equals("coin")||type.equals("enemy"))){String key=type;currentContacts.add(key);if(!previousContacts.contains(key))executePhase("collision",key);}
+            if(overlap&&(type.equals("coin")||type.equals("enemy"))){String key=type+":"+name;currentContacts.add(key);if(!previousContacts.contains(key))executePhase("collision",type);}
         }
         if(runtimePlayerY+ph>=500){runtimePlayerY=500-ph;runtimePlayerVY=0;runtimeGrounded=true;}
         previousContacts.clear();previousContacts.addAll(currentContacts);
