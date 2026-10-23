@@ -115,6 +115,7 @@ public class MainActivity extends Activity {
     // Runtime state is separate from editor data; play-testing never changes saved object positions.
     final Map<String,Double> runtimeVars = new HashMap<>();
     final Set<String> hiddenRuntimeObjects = new HashSet<>();
+    final Set<String> destroyedRuntimeObjects = new HashSet<>();
     final Set<String> previousContacts = new HashSet<>();
     final Map<Integer,Long> eventTimerLastFired = new HashMap<>();
     final Map<Integer,Boolean> eventConditionWasTrue = new HashMap<>();
@@ -130,7 +131,7 @@ public class MainActivity extends Activity {
         runtimeVars.clear();runtimeVars.put("Score",0d);runtimeVars.put("Lives",3d);runtimeVars.put("Timer",0d);
         JSONArray savedVars=project.optJSONArray("variables");
         if(savedVars!=null)for(int i=0;i<savedVars.length();i++){JSONObject v=savedVars.optJSONObject(i);if(v!=null){String n=v.optString("name","").trim();if(!n.isEmpty())putRuntimeVar(n,v.optDouble("value",0));}}
-        hiddenRuntimeObjects.clear();previousContacts.clear();eventTimerLastFired.clear();eventConditionWasTrue.clear();
+        hiddenRuntimeObjects.clear();destroyedRuntimeObjects.clear();previousContacts.clear();eventTimerLastFired.clear();eventConditionWasTrue.clear();
         runtimeScore=0;runtimeLives=3;runtimeGravity=950;runtimeMoveSpeed=240;runtimeJumpStrength=430;runtimeTimeScale=1;
         runtimePlayerVY=0;moveAxis=0;jumpRequested=false;runtimeGrounded=false;
         JSONObject player=findPlayer();if(player!=null){runtimePlayerX=player.optDouble("x",120);runtimePlayerY=player.optDouble("y",350);}
@@ -138,7 +139,7 @@ public class MainActivity extends Activity {
         lastRuntimeTick=System.currentTimeMillis();runtimeStartMillis=lastRuntimeTick;runtimeStarted=true;
         executePhase("start",null);
     }
-    void stopRuntime(){runtimeStarted=false;moveAxis=0;jumpRequested=false;hiddenRuntimeObjects.clear();previousContacts.clear();}
+    void stopRuntime(){runtimeStarted=false;moveAxis=0;jumpRequested=false;hiddenRuntimeObjects.clear();destroyedRuntimeObjects.clear();previousContacts.clear();}
     JSONObject findPlayer(){
         JSONArray a=objects();for(int i=0;i<a.length();i++){JSONObject o=a.optJSONObject(i);if(o!=null&&(o.optString("type").equalsIgnoreCase("player")||o.optString("name").equalsIgnoreCase("player")))return o;}return null;
     }
@@ -269,6 +270,12 @@ public class MainActivity extends Activity {
             if(name.equals(q)||type.equals(q)||name.contains(q)){if(hidden)hiddenRuntimeObjects.add(o.optString("name",""));else hiddenRuntimeObjects.remove(o.optString("name",""));}
         }
     }
+    void destroyMatchingObjects(String query){
+        String q=query.trim().toLowerCase(Locale.ROOT);JSONArray a=objects();
+        for(int i=0;i<a.length();i++){JSONObject o=a.optJSONObject(i);if(o==null)continue;String name=o.optString("name","").toLowerCase(Locale.ROOT),type=o.optString("type","").toLowerCase(Locale.ROOT);
+            if(name.equals(q)||type.equals(q)||name.contains(q))destroyedRuntimeObjects.add(o.optString("name",""));
+        }
+    }
     void runAction(String action){
         String low=action.toLowerCase(Locale.ROOT);
         String command=action.trim();
@@ -294,7 +301,7 @@ public class MainActivity extends Activity {
             putRuntimeVar(key,resolveValue(key)==null?0:resolveValue(key)+(m==customAdd?value:-value));updateHudValues();return;
         }
         if(teleport.matches()){runtimePlayerX=Double.parseDouble(teleport.group(1));runtimePlayerY=Double.parseDouble(teleport.group(2));runtimePlayerVY=0;updateHudValues();return;}
-        if(hide.matches()){String verb=hide.group(1).toLowerCase(Locale.ROOT),target=hide.group(2);hideMatchingObjects(target,!verb.equals("show"));updateHudValues();return;}
+        if(hide.matches()){String verb=hide.group(1).toLowerCase(Locale.ROOT),target=hide.group(2);if(verb.equals("destroy"))destroyMatchingObjects(target);else hideMatchingObjects(target,verb.equals("hide"));updateHudValues();return;}
         if(command.equalsIgnoreCase("respawn Player")||command.equalsIgnoreCase("respawn player")){runtimePlayerX=runtimeSpawnX;runtimePlayerY=runtimeSpawnY;runtimePlayerVY=0;runtimeGrounded=false;updateHudValues();return;}
         Matcher set=Pattern.compile("(?i).*đặt(?:\\s+biến)?\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*([A-Za-z0-9_ .+*/()%\\-]+).*").matcher(action);
         if(set.matches()){try{Double value=resolveValue(set.group(2));if(value!=null)putRuntimeVar(set.group(1),value);}catch(Exception ignored){}}
@@ -335,7 +342,7 @@ public class MainActivity extends Activity {
         for(int i=0;i<all.length();i++){
             JSONObject o=all.optJSONObject(i);if(o==null||o==player)continue;
             String type=o.optString("type","").toLowerCase(Locale.ROOT),name=o.optString("name","Object");
-            if(hiddenRuntimeObjects.contains(name))continue;
+            if(hiddenRuntimeObjects.contains(name)||destroyedRuntimeObjects.contains(name))continue;
             double ox=o.optDouble("x"),oy=o.optDouble("y"),ow=Math.max(1,o.optDouble("w")),oh=Math.max(1,o.optDouble("h"));
             boolean overlap=runtimePlayerX<ox+ow&&runtimePlayerX+pw>ox&&runtimePlayerY<oy+oh&&runtimePlayerY+ph>oy;
             if(type.equals("platform")&&runtimePlayerVY>=0&&oldBottom<=oy+12&&runtimePlayerY+ph>=oy&&runtimePlayerX+pw>ox&&runtimePlayerX<ox+ow){runtimePlayerY=oy-ph;runtimePlayerVY=0;runtimeGrounded=true;}
@@ -518,7 +525,7 @@ public class MainActivity extends Activity {
         Paint p=new Paint(3);boolean run,three;float dx,dy;double sx,sy;boolean drag;
         SceneView(boolean r,boolean d){super(MainActivity.this);run=r;three=d;setBackgroundColor(bg);}
         @Override protected void onDraw(Canvas c){super.onDraw(c);c.drawColor(Color.rgb(20,33,51));if(run)tickRuntime();float scale=Math.min(getWidth()/960f,getHeight()/540f);if(scale<=0)return;c.save();c.translate((getWidth()-960*scale)/2,(getHeight()-540*scale)/2);c.scale(scale,scale);if(three)draw3(c);else draw2(c);c.restore();p.setColor(muted);p.setTextSize(18);c.drawText(run?(three?"CHẠY THỬ 3D":"CHẠY THỬ 2D"):(three?"3D VIEW":"2D SCENE"),12,24,p);if(run){p.setColor(Color.WHITE);p.setTextSize(20);c.drawText("Score: "+runtimeScore+"   Lives: "+runtimeLives,12,52,p);postInvalidateDelayed(40);}}
-        void draw2(Canvas c){p.setColor(Color.rgb(100,180,242));c.drawRect(0,0,960,540,p);p.setColor(Color.rgb(129,201,252));for(int x=0;x<=960;x+=40)c.drawLine(x,0,x,540,p);for(int y=0;y<=540;y+=40)c.drawLine(0,y,960,y,p);JSONArray a=objects();for(int i=0;i<a.length();i++){JSONObject o=a.optJSONObject(i);if(o==null||(run&&hiddenRuntimeObjects.contains(o.optString("name"))))continue;float x=(float)o.optDouble("x"),y=(float)o.optDouble("y"),w=(float)o.optDouble("w"),h=(float)o.optDouble("h");String type=o.optString("type");if(run&&type.equals("player")){x=(float)runtimePlayerX;y=(float)runtimePlayerY;}p.setColor(o.optInt("color",Color.WHITE));Bitmap sprite=loadSprite(o.optString("image",""));if(sprite!=null)c.drawBitmap(sprite,null,new RectF(x,y,x+Math.max(1,w),y+Math.max(1,h)),p);else if(type.equals("coin"))c.drawCircle(x+w/2,y+h/2,Math.max(w,h)/2,p);else if(type.equals("platform")){c.drawRect(x,y,x+Math.max(40,w),y+Math.max(20,h),p);p.setColor(Color.rgb(117,73,45));c.drawRect(x,y+h*.6f,x+Math.max(40,w),y+Math.max(20,h),p);}else if(type.equals("camera")||type.equals("light")){p.setTextSize(25);c.drawText(type.equals("camera")?"CAM":"LGT",x+8,y+32,p);}else{c.drawRoundRect(x,y,x+Math.max(34,w),y+Math.max(34,h),8,8,p);p.setColor(Color.WHITE);p.setTextSize(13);c.drawText(o.optString("name"),x,y-4,p);}if(!run&&i==selected){p.setColor(Color.WHITE);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(3);c.drawRect(x-4,y-4,x+Math.max(34,w)+4,y+Math.max(34,h)+4,p);p.setStyle(Paint.Style.FILL);}}}
+        void draw2(Canvas c){p.setColor(Color.rgb(100,180,242));c.drawRect(0,0,960,540,p);p.setColor(Color.rgb(129,201,252));for(int x=0;x<=960;x+=40)c.drawLine(x,0,x,540,p);for(int y=0;y<=540;y+=40)c.drawLine(0,y,960,y,p);JSONArray a=objects();for(int i=0;i<a.length();i++){JSONObject o=a.optJSONObject(i);if(o==null||(run&&(hiddenRuntimeObjects.contains(o.optString("name"))||destroyedRuntimeObjects.contains(o.optString("name")))))continue;float x=(float)o.optDouble("x"),y=(float)o.optDouble("y"),w=(float)o.optDouble("w"),h=(float)o.optDouble("h");String type=o.optString("type");if(run&&type.equals("player")){x=(float)runtimePlayerX;y=(float)runtimePlayerY;}p.setColor(o.optInt("color",Color.WHITE));Bitmap sprite=loadSprite(o.optString("image",""));if(sprite!=null)c.drawBitmap(sprite,null,new RectF(x,y,x+Math.max(1,w),y+Math.max(1,h)),p);else if(type.equals("coin"))c.drawCircle(x+w/2,y+h/2,Math.max(w,h)/2,p);else if(type.equals("platform")){c.drawRect(x,y,x+Math.max(40,w),y+Math.max(20,h),p);p.setColor(Color.rgb(117,73,45));c.drawRect(x,y+h*.6f,x+Math.max(40,w),y+Math.max(20,h),p);}else if(type.equals("camera")||type.equals("light")){p.setTextSize(25);c.drawText(type.equals("camera")?"CAM":"LGT",x+8,y+32,p);}else{c.drawRoundRect(x,y,x+Math.max(34,w),y+Math.max(34,h),8,8,p);p.setColor(Color.WHITE);p.setTextSize(13);c.drawText(o.optString("name"),x,y-4,p);}if(!run&&i==selected){p.setColor(Color.WHITE);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(3);c.drawRect(x-4,y-4,x+Math.max(34,w)+4,y+Math.max(34,h)+4,p);p.setStyle(Paint.Style.FILL);}}}
         void draw3(Canvas c){p.setColor(Color.rgb(34,51,73));c.drawRect(0,0,960,540,p);p.setColor(Color.rgb(65,87,111));for(int i=-800;i<1600;i+=50){c.drawLine(480+i,0,480+i*.45f,540,p);c.drawLine(0,270+i*.24f,960,270+i*.24f,p);}JSONArray a=objects();for(int i=0;i<a.length();i++){JSONObject o=a.optJSONObject(i);if(o==null||(run&&hiddenRuntimeObjects.contains(o.optString("name"))))continue;String type=o.optString("type");p.setColor(o.optInt("color",Color.BLUE));if(type.equals("camera")||type.equals("light")){p.setTextSize(22);c.drawText(type.equals("camera")?"◉ Camera":"☼ Light",35+i*20,55+i*24,p);continue;}float x=(float)o.optDouble("x"),y=(float)o.optDouble("y"),s=Math.max(30,(float)o.optDouble("w",60));x=480+(x-480)*.72f-(y-270)*.35f;y=280+(y-270)*.48f+(x-480)*.18f;Path path=new Path();path.moveTo(x,y-s);path.lineTo(x+s/2,y-s+s/3);path.lineTo(x,y-s+2*s/3);path.lineTo(x-s/2,y-s+s/3);path.close();p.setColor(o.optInt("color",Color.BLUE));c.drawPath(path,p);p.setColor(Color.rgb(35,74,138));c.drawRect(x-s/2,y-s+s/3,x,y+s/3,p);p.setColor(Color.rgb(27,57,111));c.drawRect(x,y-s+2*s/3,x+s/2,y+s/3,p);}}
         @Override public boolean onTouchEvent(android.view.MotionEvent e){float scale=Math.min(getWidth()/960f,getHeight()/540f);if(scale<=0)return true;if(e.getAction()==MotionEvent.ACTION_DOWN){dx=e.getX();dy=e.getY();if(run){jumpRequested=true;invalidate();return true;}JSONArray a=objects();double best=Double.MAX_VALUE;for(int i=0;i<a.length();i++){JSONObject o=a.optJSONObject(i);double ox=(dx-getWidth()/2f+480*scale)/scale,oy=(dy-getHeight()/2f+270*scale)/scale;double dd=Math.pow(ox-o.optDouble("x")-o.optDouble("w")/2,2)+Math.pow(oy-o.optDouble("y")-o.optDouble("h")/2,2);if(dd<best){best=dd;selected=i;}}if(selected<a.length()){JSONObject o=a.optJSONObject(selected);sx=o.optDouble("x");sy=o.optDouble("y");drag=true;}invalidate();return true;}if(e.getAction()==MotionEvent.ACTION_MOVE&&drag){JSONObject o=objects().optJSONObject(selected);try{o.put("x",Math.max(0,Math.min(900,sx+(e.getX()-dx)/scale)));o.put("y",Math.max(0,Math.min(500,sy+(e.getY()-dy)/scale)));}catch(Exception ignored){}invalidate();return true;}if(e.getAction()==MotionEvent.ACTION_UP){if(drag)save();drag=false;return true;}return true;}
     }
