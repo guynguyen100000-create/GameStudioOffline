@@ -107,24 +107,30 @@ public class MainActivity extends Activity {
         }catch(Exception e){toast("Lỗi tạo dự án: "+e.getMessage());}
     }
     int selected=0;
-    final String[] triggerChoices={"Khi bắt đầu cảnh","Mỗi khung hình","Khi Player chạm Coin","Khi Player chạm Enemy","Khi bấm nút Nhảy"};
-    final String[] actionChoices={"Đặt biến Score = 0","Tăng Score thêm 1","Tăng Score thêm 10","Ẩn Coin","Hiện Coin","Cho Player nhảy","Trừ 1 mạng","Di chuyển Player","Di chuyển Player sang trái","Di chuyển Player sang phải"};
+    final String[] triggerChoices={"Khi bắt đầu cảnh","Mỗi khung hình","Mỗi 1 giây","Mỗi 5 giây","Mỗi 10 giây","Khi Player chạm Coin","Khi Player chạm Enemy","Khi bấm nút Nhảy","Khi điều kiện chuyển thành đúng","Trong khi điều kiện đúng","Khi Player rơi khỏi màn hình"};
+    final String[] actionChoices={"Đặt biến Score = 0","Tăng Score thêm 1","Tăng Score thêm 10","Giảm Score đi 1","Đặt biến Lives = 3","Tăng Lives thêm 1","Ẩn Coin","Hiện Coin","Ẩn Enemy","Hiện Enemy","Cho Player nhảy","Trừ 1 mạng","Di chuyển Player","Di chuyển Player sang trái","Di chuyển Player sang phải","Hồi sinh Player","Đặt Gravity = 950","Đặt MoveSpeed = 240","Đặt JumpStrength = 430","Lệnh tùy chỉnh (xem ô bên dưới)"};
     // Runtime state is separate from editor data; play-testing never changes saved object positions.
     final Map<String,Double> runtimeVars = new HashMap<>();
     final Set<String> hiddenRuntimeObjects = new HashSet<>();
     final Set<String> previousContacts = new HashSet<>();
+    final Map<Integer,Long> eventTimerLastFired = new HashMap<>();
+    final Map<Integer,Boolean> eventConditionWasTrue = new HashMap<>();
     double runtimePlayerX=120, runtimePlayerY=350, runtimePlayerVY=0;
+    double runtimeSpawnX=120, runtimeSpawnY=350;
+    double runtimeGravity=950, runtimeMoveSpeed=240, runtimeJumpStrength=430, runtimeTimeScale=1;
     float moveAxis=0;
     boolean runtimeGrounded=false, jumpRequested=false, runtimeStarted=false;
     int runtimeScore=0, runtimeLives=3;
-    long lastRuntimeTick=0;
+    long lastRuntimeTick=0, runtimeStartMillis=0;
 
     void startRuntime(){
-        runtimeVars.clear();runtimeVars.put("Score",0d);runtimeVars.put("Lives",3d);
-        hiddenRuntimeObjects.clear();previousContacts.clear();runtimeScore=0;runtimeLives=3;
+        runtimeVars.clear();runtimeVars.put("Score",0d);runtimeVars.put("Lives",3d);runtimeVars.put("Timer",0d);
+        hiddenRuntimeObjects.clear();previousContacts.clear();eventTimerLastFired.clear();eventConditionWasTrue.clear();
+        runtimeScore=0;runtimeLives=3;runtimeGravity=950;runtimeMoveSpeed=240;runtimeJumpStrength=430;runtimeTimeScale=1;
         runtimePlayerVY=0;moveAxis=0;jumpRequested=false;runtimeGrounded=false;
         JSONObject player=findPlayer();if(player!=null){runtimePlayerX=player.optDouble("x",120);runtimePlayerY=player.optDouble("y",350);}
-        lastRuntimeTick=System.currentTimeMillis();runtimeStarted=true;
+        runtimeSpawnX=runtimePlayerX;runtimeSpawnY=runtimePlayerY;
+        lastRuntimeTick=System.currentTimeMillis();runtimeStartMillis=lastRuntimeTick;runtimeStarted=true;
         executePhase("start",null);
     }
     void stopRuntime(){runtimeStarted=false;moveAxis=0;jumpRequested=false;hiddenRuntimeObjects.clear();previousContacts.clear();}
@@ -133,30 +139,149 @@ public class MainActivity extends Activity {
     }
     void executePhase(String phase,String contactType){
         JSONArray events=project.optJSONArray("events");if(events==null)return;
+        long now=System.currentTimeMillis();
+        double elapsed=Math.max(0,(now-runtimeStartMillis)/1000d);
+        runtimeVars.put("Timer",elapsed);
         for(int i=0;i<events.length();i++){
             JSONObject e=events.optJSONObject(i);if(e==null)continue;
             String trigger=e.optString("trigger","").toLowerCase(Locale.ROOT);
+            String condition=e.optString("condition","").trim();
             boolean match=false;
             if("start".equals(phase))match=trigger.contains("bắt đầu cảnh");
-            else if("frame".equals(phase))match=trigger.contains("mỗi khung hình")||trigger.contains("mỗi frame");
+            else if("frame".equals(phase)){
+                if(trigger.contains("mỗi khung hình")||trigger.contains("mỗi frame"))match=true;
+                else if(trigger.contains("trong khi điều kiện đúng"))match=!condition.isEmpty()&&evaluateCondition(condition);
+                else if(trigger.contains("khi điều kiện chuyển thành đúng")){
+                    boolean current=!condition.isEmpty()&&evaluateCondition(condition);
+                    boolean wasTrue=eventConditionWasTrue.getOrDefault(i,false);
+                    eventConditionWasTrue.put(i,current);match=current&&!wasTrue;
+                }else{
+                    Matcher timer=Pattern.compile("mỗi\\s+(\\d+(?:\\.\\d+)?)\\s+giây").matcher(trigger);
+                    if(timer.find()){
+                        double interval=Math.max(.1,Double.parseDouble(timer.group(1)));
+                        long previous=eventTimerLastFired.getOrDefault(i,runtimeStartMillis);
+                        if(now-previous>=interval*1000){match=true;eventTimerLastFired.put(i,now);}
+                    }else if(trigger.contains("player rơi khỏi màn hình")){
+                        boolean fell=runtimePlayerY>560;
+                        boolean wasFallen=eventConditionWasTrue.getOrDefault(i,false);
+                        eventConditionWasTrue.put(i,fell);match=fell&&!wasFallen;
+                    }
+                }
+            }
             else if("jump".equals(phase))match=trigger.contains("bấm nút nhảy")||trigger.contains("nút nhảy");
             else if("collision".equals(phase))match=trigger.contains("chạm")&&contactType!=null&&trigger.contains(contactType.toLowerCase(Locale.ROOT));
-            if(match)runAction(e.optString("action",""));
+            if(match&&!condition.isEmpty()&&!trigger.contains("điều kiện chuyển thành đúng")&&!trigger.contains("trong khi điều kiện đúng"))match=evaluateCondition(condition);
+            if(match){
+                String custom=e.optString("customAction","").trim();
+                runAction(custom.isEmpty()?e.optString("action",""):custom);
+            }
+        }
+    }
+    boolean evaluateCondition(String expression){
+        if(expression==null||expression.trim().isEmpty())return true;
+        String s=expression.trim();
+        while(s.startsWith("(")&&s.endsWith(")")&&isOuterParentheses(s))s=s.substring(1,s.length()-1).trim();
+        int split=findTopLevelLogical(s,"||");
+        if(split>=0)return evaluateCondition(s.substring(0,split))||evaluateCondition(s.substring(split+2));
+        split=findTopLevelLogical(s,"&&");
+        if(split>=0)return evaluateCondition(s.substring(0,split))&&evaluateCondition(s.substring(split+2));
+        if(s.startsWith("!"))return !evaluateCondition(s.substring(1));
+        Matcher comparison=Pattern.compile("^(.+?)\\s*(>=|<=|==|!=|>|<)\\s*(.+)$").matcher(s);
+        if(comparison.matches()){
+            String left=comparison.group(1).trim(),op=comparison.group(2),right=comparison.group(3).trim();
+            Double a=resolveValue(left),b=resolveValue(right);
+            if(a==null||b==null)return "==".equals(op)?resolveText(left).equalsIgnoreCase(resolveText(right)):"!=".equals(op)&&!resolveText(left).equalsIgnoreCase(resolveText(right));
+            switch(op){case ">=":return a>=b;case "<=":return a<=b;case ">":return a>b;case "<":return a<b;case "==":return Math.abs(a-b)<0.000001;case "!=":return Math.abs(a-b)>=0.000001;}
+        }
+        if("true".equalsIgnoreCase(s))return true;if("false".equalsIgnoreCase(s))return false;
+        Double value=resolveValue(s);return value!=null&&value!=0;
+    }
+    int findTopLevelLogical(String s,String operator){
+        int depth=0;
+        for(int i=0;i<=s.length()-operator.length();i++){
+            char ch=s.charAt(i);if(ch=='(')depth++;else if(ch==')')depth--;
+            if(depth==0&&s.startsWith(operator,i))return i;
+        }
+        return -1;
+    }
+    boolean isOuterParentheses(String s){
+        int depth=0;for(int i=0;i<s.length();i++){char ch=s.charAt(i);if(ch=='(')depth++;else if(ch==')')depth--;if(depth==0&&i<s.length()-1)return false;}return depth==0;
+    }
+    String resolveText(String token){
+        String key=token.trim();
+        if(key.equalsIgnoreCase("Player.X"))return Double.toString(runtimePlayerX);
+        if(key.equalsIgnoreCase("Player.Y"))return Double.toString(runtimePlayerY);
+        if(key.equalsIgnoreCase("Timer"))return Double.toString(Math.max(0,(System.currentTimeMillis()-runtimeStartMillis)/1000d));
+        return key;
+    }
+    Double resolveValue(String token){
+        String s=token.trim();
+        try{return Double.parseDouble(s);}catch(Exception ignored){}
+        if("Player.X".equalsIgnoreCase(s))return runtimePlayerX;
+        if("Player.Y".equalsIgnoreCase(s))return runtimePlayerY;
+        if("Player.VY".equalsIgnoreCase(s))return runtimePlayerVY;
+        if("Timer".equalsIgnoreCase(s))return Math.max(0,(System.currentTimeMillis()-runtimeStartMillis)/1000d);
+        for(Map.Entry<String,Double> entry:runtimeVars.entrySet())if(entry.getKey().equalsIgnoreCase(s))return entry.getValue();
+        return null;
+    }
+    void putRuntimeVar(String name,double value){
+        String key=name.trim();for(String existing:runtimeVars.keySet())if(existing.equalsIgnoreCase(key)){key=existing;break;}runtimeVars.put(key,value);
+    }
+    void updateHudValues(){
+        runtimeScore=(int)Math.round(runtimeVars.getOrDefault("Score",0d));
+        runtimeLives=(int)Math.round(runtimeVars.getOrDefault("Lives",3d));
+    }
+    void hideMatchingObjects(String query,boolean hidden){
+        String q=query.trim().toLowerCase(Locale.ROOT);JSONArray a=objects();
+        for(int i=0;i<a.length();i++){JSONObject o=a.optJSONObject(i);if(o==null)continue;String name=o.optString("name","").toLowerCase(Locale.ROOT),type=o.optString("type","").toLowerCase(Locale.ROOT);
+            if(name.equals(q)||type.equals(q)||name.contains(q)){if(hidden)hiddenRuntimeObjects.add(o.optString("name",""));else hiddenRuntimeObjects.remove(o.optString("name",""));}
         }
     }
     void runAction(String action){
         String low=action.toLowerCase(Locale.ROOT);
+        String command=action.trim();
+        Matcher customSet=Pattern.compile("(?i)^set\\s+([A-Za-z_][A-Za-z0-9_.]*)\\s*=\\s*(-?\\d+(?:\\.\\d+)?)$").matcher(command);
+        Matcher customAdd=Pattern.compile("(?i)^add\\s+([A-Za-z_][A-Za-z0-9_]*)\\s+(-?\\d+(?:\\.\\d+)?)$").matcher(command);
+        Matcher customSub=Pattern.compile("(?i)^subtract\\s+([A-Za-z_][A-Za-z0-9_]*)\\s+(-?\\d+(?:\\.\\d+)?)$").matcher(command);
+        Matcher teleport=Pattern.compile("(?i)^teleport\\s+player\\s+(-?\\d+(?:\\.\\d+)?)\\s+(-?\\d+(?:\\.\\d+)?)$").matcher(command);
+        Matcher hide=Pattern.compile("(?i)^(hide|show|destroy)\\s+(.+)$").matcher(command);
+        if(customSet.matches()){
+            String key=customSet.group(1);double value=Double.parseDouble(customSet.group(2));
+            if(key.equalsIgnoreCase("Player.X"))runtimePlayerX=value;
+            else if(key.equalsIgnoreCase("Player.Y"))runtimePlayerY=value;
+            else if(key.equalsIgnoreCase("Player.VY"))runtimePlayerVY=value;
+            else if(key.equalsIgnoreCase("Gravity"))runtimeGravity=Math.max(0,value);
+            else if(key.equalsIgnoreCase("MoveSpeed"))runtimeMoveSpeed=Math.max(0,value);
+            else if(key.equalsIgnoreCase("JumpStrength"))runtimeJumpStrength=Math.max(0,value);
+            else if(key.equalsIgnoreCase("TimeScale"))runtimeTimeScale=Math.max(0,Math.min(3,value));
+            else putRuntimeVar(key,value);
+            updateHudValues();return;
+        }
+        if(customAdd.matches()||customSub.matches()){
+            Matcher m=customAdd.matches()?customAdd:customSub;String key=m.group(1);double value=Double.parseDouble(m.group(2));
+            putRuntimeVar(key,resolveValue(key)==null?0:resolveValue(key)+(m==customAdd?value:-value));updateHudValues();return;
+        }
+        if(teleport.matches()){runtimePlayerX=Double.parseDouble(teleport.group(1));runtimePlayerY=Double.parseDouble(teleport.group(2));runtimePlayerVY=0;updateHudValues();return;}
+        if(hide.matches()){String verb=hide.group(1).toLowerCase(Locale.ROOT),target=hide.group(2);hideMatchingObjects(target,!verb.equals("show"));updateHudValues();return;}
+        if(command.equalsIgnoreCase("respawn Player")||command.equalsIgnoreCase("respawn player")){runtimePlayerX=runtimeSpawnX;runtimePlayerY=runtimeSpawnY;runtimePlayerVY=0;runtimeGrounded=false;updateHudValues();return;}
         Matcher set=Pattern.compile("(?i).*đặt(?:\\s+biến)?\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*(-?\\d+(?:\\.\\d+)?).*").matcher(action);
-        if(set.matches()){try{runtimeVars.put(set.group(1),Double.parseDouble(set.group(2)));}catch(Exception ignored){}}
+        if(set.matches()){try{putRuntimeVar(set.group(1),Double.parseDouble(set.group(2)));}catch(Exception ignored){}}
         Matcher inc=Pattern.compile("(?i).*tăng\\s+([A-Za-z_][A-Za-z0-9_]*)\\s+thêm\\s+(-?\\d+(?:\\.\\d+)?).*").matcher(action);
-        if(inc.matches()){try{String key=inc.group(1);runtimeVars.put(key,runtimeVars.getOrDefault(key,0d)+Double.parseDouble(inc.group(2)));}catch(Exception ignored){}}
+        Matcher dec=Pattern.compile("(?i).*giảm\\s+([A-Za-z_][A-Za-z0-9_]*)\\s+đi\\s+(-?\\d+(?:\\.\\d+)?).*").matcher(action);
+        if(inc.matches()){try{String key=inc.group(1);putRuntimeVar(key,(resolveValue(key)==null?0:resolveValue(key))+Double.parseDouble(inc.group(2)));}catch(Exception ignored){}}
+        if(dec.matches()){try{String key=dec.group(1);putRuntimeVar(key,(resolveValue(key)==null?0:resolveValue(key))-Double.parseDouble(dec.group(2)));}catch(Exception ignored){}}
         if(low.contains("ẩn coin")||low.contains("hide coin"))setCoinsHidden(true);
         if(low.contains("hiện coin")||low.contains("show coin"))setCoinsHidden(false);
-        if(low.contains("trừ")&&low.contains("mạng"))runtimeVars.put("Lives",runtimeVars.getOrDefault("Lives",3d)-1);
-        if(low.contains("nhảy")||low.contains("jump")){if(runtimeGrounded){runtimePlayerVY=-430;runtimeGrounded=false;}}
+        if(low.contains("ẩn enemy"))hideMatchingObjects("enemy",true);
+        if(low.contains("hiện enemy"))hideMatchingObjects("enemy",false);
+        if(low.contains("trừ")&&low.contains("mạng"))putRuntimeVar("Lives",(resolveValue("Lives")==null?3:resolveValue("Lives"))-1);
+        if(low.contains("hồi sinh player")){runtimePlayerX=runtimeSpawnX;runtimePlayerY=runtimeSpawnY;runtimePlayerVY=0;runtimeGrounded=false;}
+        if(low.contains("gravity ="))runtimeGravity=950;
+        if(low.contains("movespeed ="))runtimeMoveSpeed=240;
+        if(low.contains("jumpstrength ="))runtimeJumpStrength=430;
+        if(low.contains("nhảy")||low.contains("jump")){if(runtimeGrounded){runtimePlayerVY=-runtimeJumpStrength;runtimeGrounded=false;}}
         if(low.contains("di chuyển player")||low.contains("move player")){if(low.contains("sang trái")||low.contains("left"))runtimePlayerX-=3;else if(low.contains("sang phải")||low.contains("right"))runtimePlayerX+=3;else runtimePlayerX+=2;runtimePlayerX=Math.max(0,Math.min(900,runtimePlayerX));}
-        runtimeScore=(int)Math.round(runtimeVars.getOrDefault("Score",0d));
-        runtimeLives=(int)Math.round(runtimeVars.getOrDefault("Lives",3d));
+        updateHudValues();
     }
     void setCoinsHidden(boolean hidden){
         JSONArray a=objects();for(int i=0;i<a.length();i++){JSONObject o=a.optJSONObject(i);if(o!=null&&o.optString("type").equalsIgnoreCase("coin")){if(hidden)hiddenRuntimeObjects.add(o.optString("name"));else hiddenRuntimeObjects.remove(o.optString("name"));}}
@@ -166,11 +291,12 @@ public class MainActivity extends Activity {
         long now=System.currentTimeMillis();double dt=Math.min(.05,Math.max(.001,(now-lastRuntimeTick)/1000d));lastRuntimeTick=now;
         JSONObject player=findPlayer();if(player==null)return;
         executePhase("frame",null);
-        if(jumpRequested){executePhase("jump",null);if(runtimeGrounded){runtimePlayerVY=-430;runtimeGrounded=false;}jumpRequested=false;}
+        if(jumpRequested){executePhase("jump",null);if(runtimeGrounded){runtimePlayerVY=-runtimeJumpStrength;runtimeGrounded=false;}jumpRequested=false;}
         double pw=Math.max(20,player.optDouble("w",48)),ph=Math.max(20,player.optDouble("h",60));
         double oldBottom=runtimePlayerY+ph;
-        runtimePlayerX=Math.max(0,Math.min(960-pw,runtimePlayerX+moveAxis*240*dt));
-        runtimePlayerVY=Math.min(700,runtimePlayerVY+950*dt);
+        dt*=runtimeTimeScale;
+        runtimePlayerX=Math.max(0,Math.min(960-pw,runtimePlayerX+moveAxis*runtimeMoveSpeed*dt));
+        runtimePlayerVY=Math.min(1200,runtimePlayerVY+runtimeGravity*dt);
         runtimePlayerY=Math.max(0,runtimePlayerY+runtimePlayerVY*dt);
         runtimeGrounded=false;
         JSONArray all=objects();Set<String> currentContacts=new HashSet<>();
@@ -268,12 +394,15 @@ public class MainActivity extends Activity {
         JSONArray a=project.optJSONArray("events");
         if(a!=null)for(int i=0;i<a.length();i++){
             int idx=i;JSONObject e=a.optJSONObject(i);
-            TextView t=card("🟩 KHI "+e.optString("trigger")+"\\n🟦 LÀM "+e.optString("action"));
+            String shownAction=e.optString("customAction","").trim();if(shownAction.isEmpty())shownAction=e.optString("action","");
+            String cond=e.optString("condition","").trim();
+            TextView t=card("🟩 KHI "+e.optString("trigger")+(cond.isEmpty()?"":"\\n🔎 NẾU "+cond)+"\\n🟦 LÀM "+shownAction);
             root.addView(t);t.setOnClickListener(v->editEvent(idx));
             t.setOnLongClickListener(v->{new AlertDialog.Builder(this).setMessage("Xóa khối này?").setNegativeButton("Hủy",null).setPositiveButton("Xóa",(d,w)->{project.optJSONArray("events").remove(idx);save();editor();}).show();return true;});
         }
         root.addView(btn("+ Thêm sự kiện",()->editEvent(-1)));
-        root.addView(label("Đang hỗ trợ chạy thử: bắt đầu cảnh, mỗi khung hình, chạm Coin/Enemy, nút nhảy, đặt/tăng biến, ẩn/hiện Coin, di chuyển và trừ mạng. Các khối khác có thể được lưu nhưng chưa thực thi.",12,muted,false));
+        root.addView(label("Điều kiện hỗ trợ: Score >= 10, Lives <= 0, Timer > 5, Player.X >= 300; kết hợp &&, ||, ! và dấu ngoặc. Chọn 'Khi điều kiện chuyển thành đúng' để chạy một lần khi điều kiện vừa đúng.",12,muted,false));
+        root.addView(label("Lệnh tùy chỉnh: set Score = 10; add Score 5; subtract Lives 1; set Player.X = 100; set Player.Y = 200; set Gravity = 800; set MoveSpeed = 300; set JumpStrength = 500; set TimeScale = 0.5; teleport Player 120 300; hide Coin; show Enemy; destroy Enemy; respawn Player.",12,muted,false));
     }
     void editEvent(int index){
         JSONArray existingEvents=project.optJSONArray("events");
@@ -284,11 +413,18 @@ public class MainActivity extends Activity {
         trigger.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,triggerChoices));
         action.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,actionChoices));
         if(old!=null){for(int i=0;i<triggerChoices.length;i++)if(triggerChoices[i].equals(old.optString("trigger")))trigger.setSelection(i);for(int i=0;i<actionChoices.length;i++)if(actionChoices[i].equals(old.optString("action")))action.setSelection(i);}
+        EditText condition=field(old==null?"":old.optString("condition",""));
+        condition.setHint("VD: Score >= 10 && Lives > 0");
+        EditText customAction=field(old==null?"":old.optString("customAction",""));
+        customAction.setHint("Lệnh tùy chỉnh, để trống dùng lựa chọn phía trên");
         LinearLayout box=new LinearLayout(this);box.setOrientation(1);box.setPadding(dp(12),dp(8),dp(12),dp(8));
-        box.addView(label("KHI — Điều kiện",13,muted,true));box.addView(trigger);
+        box.addView(label("KHI — Thời điểm / sự kiện",13,muted,true));box.addView(trigger);
+        box.addView(label("NẾU — Điều kiện bổ sung (có thể để trống)",13,muted,true));box.addView(condition);
         box.addView(label("LÀM — Hành động",13,muted,true));box.addView(action);
-        new AlertDialog.Builder(this).setTitle(index<0?"Tạo sự kiện":"Sửa sự kiện").setView(box).setNegativeButton("Hủy",null).setPositiveButton("Lưu",(d,w)->{
-            try{JSONObject e=new JSONObject();e.put("trigger",trigger.getSelectedItem().toString());e.put("action",action.getSelectedItem().toString());if(index>=0&&index<list.length())list.put(index,e);else list.put(e);save();editor();}catch(Exception ex){toast("Không lưu được sự kiện");}
+        box.addView(label("Lệnh tùy chỉnh (tùy chọn, thay thế hành động đã chọn)",13,muted,true));box.addView(customAction);
+        TextView hint=label("Ví dụ điều kiện: Score >= 10 && Lives > 0. Ví dụ lệnh: add Score 5 hoặc teleport Player 100 250.",11,muted,false);box.addView(hint);
+        new AlertDialog.Builder(this).setTitle(index<0?"Tạo sự kiện":"Sửa sự kiện").setView(scroll(box)).setNegativeButton("Hủy",null).setPositiveButton("Lưu",(d,w)->{
+            try{JSONObject e=new JSONObject();e.put("trigger",trigger.getSelectedItem().toString());e.put("action",action.getSelectedItem().toString());e.put("condition",condition.getText().toString().trim());e.put("customAction",customAction.getText().toString().trim());if(index>=0&&index<list.length())list.put(index,e);else list.put(e);save();editor();}catch(Exception ex){toast("Không lưu được sự kiện");}
         }).show();
     }
     void apkNotice(){new AlertDialog.Builder(this).setTitle("Xuất APK").setMessage("Chức năng đóng gói APK của game người dùng chưa được tích hợp ở bản nền tảng này. Hiện có thể lưu dự án ZIP ngoại tuyến. Bộ xuất APK trực tiếp là một cột mốc kỹ thuật tiếp theo, không phải tính năng đã hoàn thành.").setPositiveButton("Xuất ZIP", (d,w)->exportZip()).setNegativeButton("Đóng",null).show();}
