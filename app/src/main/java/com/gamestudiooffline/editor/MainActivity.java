@@ -64,6 +64,8 @@ public class MainActivity extends Activity {
         }catch(Exception e){toast("Lỗi tạo dự án: "+e.getMessage());}
     }
     int selected=0;
+    final String[] triggerChoices={"Khi bắt đầu cảnh","Mỗi khung hình","Khi Player chạm Coin","Khi Player chạm Enemy","Khi bấm nút Nhảy"};
+    final String[] actionChoices={"Đặt biến Score = 0","Tăng Score thêm 1","Tăng Score thêm 10","Ẩn Coin","Hiện Coin","Cho Player nhảy","Trừ 1 mạng","Di chuyển Player","Di chuyển Player sang trái","Di chuyển Player sang phải"};
     // Runtime state is separate from editor data; play-testing never changes saved object positions.
     final Map<String,Double> runtimeVars = new HashMap<>();
     final Set<String> hiddenRuntimeObjects = new HashSet<>();
@@ -109,6 +111,7 @@ public class MainActivity extends Activity {
         if(low.contains("hiện coin")||low.contains("show coin"))setCoinsHidden(false);
         if(low.contains("trừ")&&low.contains("mạng"))runtimeVars.put("Lives",runtimeVars.getOrDefault("Lives",3d)-1);
         if(low.contains("nhảy")||low.contains("jump")){if(runtimeGrounded){runtimePlayerVY=-430;runtimeGrounded=false;}}
+        if(low.contains("di chuyển player")||low.contains("move player")){if(low.contains("sang trái")||low.contains("left"))runtimePlayerX-=3;else if(low.contains("sang phải")||low.contains("right"))runtimePlayerX+=3;else runtimePlayerX+=2;runtimePlayerX=Math.max(0,Math.min(900,runtimePlayerX));}
         runtimeScore=(int)Math.round(runtimeVars.getOrDefault("Score",0d));
         runtimeLives=(int)Math.round(runtimeVars.getOrDefault("Lives",3d));
     }
@@ -166,7 +169,7 @@ public class MainActivity extends Activity {
         else if(tab.equals("2D")||tab.equals("3D")){
             boolean three=tab.equals("3D");root.addView(label(three?"Cảnh 3D • khối cơ bản":"Cảnh 2D • kéo đối tượng để di chuyển",13,muted,true));
             root.addView(new SceneView(false,three),new LinearLayout.LayoutParams(-1,dp(320)));
-            LinearLayout tools=row();tools.addView(btn("+ Player",()->add("Player","player",Color.BLUE)));tools.addView(btn("+ Khối",()->add("Cube","cube",Color.rgb(110,130,255))));tools.addView(btn("+ Coin",()->add("Coin","coin",Color.YELLOW)));tools.addView(btn("+ Nền",()->add("Platform","platform",Color.GREEN)));root.addView(scroll(tools));
+            LinearLayout tools=row();tools.addView(btn("+ Player",()->add("Player","player",Color.BLUE)));tools.addView(btn("+ Enemy",()->add("Enemy","enemy",Color.RED)));tools.addView(btn("+ Khối",()->add("Cube","cube",Color.rgb(110,130,255))));tools.addView(btn("+ Coin",()->add("Coin","coin",Color.YELLOW)));tools.addView(btn("+ Nền",()->add("Platform","platform",Color.GREEN)));root.addView(scroll(tools));
             root.addView(label("Đang chọn: "+selectedName(),14,fg,true));root.addView(btn("Sửa thuộc tính",this::editObject));root.addView(btn("Xuất dự án ZIP",this::exportZip));root.addView(btn("Xuất APK",this::apkNotice));
         }else if(tab.equals("Đối tượng"))objectPanel(root);else eventPanel(root);
         setContentView(scroll(root));
@@ -175,7 +178,7 @@ public class MainActivity extends Activity {
     void objectPanel(LinearLayout root){
         root.addView(label("Đối tượng trong cảnh",18,fg,true));JSONArray a=objects();
         for(int i=0;i<a.length();i++){int idx=i;JSONObject o=a.optJSONObject(i);TextView t=card((i==selected?"● ":"○ ")+o.optString("name")+"  •  "+o.optString("type")+"\nX="+(int)o.optDouble("x")+"  Y="+(int)o.optDouble("y"));root.addView(t);t.setOnClickListener(v->{selected=idx;editor();});}
-        root.addView(btn("+ Thêm đối tượng",()->new AlertDialog.Builder(this).setTitle("Loại đối tượng").setItems(new String[]{"Nhân vật","Khối 3D","Coin","Nền sàn"},(d,w)->{if(w==0)add("Player","player",Color.BLUE);if(w==1)add("Cube","cube",Color.rgb(110,130,255));if(w==2)add("Coin","coin",Color.YELLOW);if(w==3)add("Platform","platform",Color.GREEN);}).show()));
+        root.addView(btn("+ Thêm đối tượng",()->new AlertDialog.Builder(this).setTitle("Loại đối tượng").setItems(new String[]{"Nhân vật","Enemy","Khối 3D","Coin","Nền sàn"},(d,w)->{if(w==0)add("Player","player",Color.BLUE);if(w==1)add("Enemy","enemy",Color.RED);if(w==2)add("Cube","cube",Color.rgb(110,130,255));if(w==3)add("Coin","coin",Color.YELLOW);if(w==4)add("Platform","platform",Color.GREEN);}).show()));
         root.addView(btn("Sửa thuộc tính",this::editObject));root.addView(btn("Xóa đối tượng",()->{if(objects().length()>0){objects().remove(selected);selected=Math.max(0,selected-1);save();editor();}}));
     }
     EditText field(String s){EditText e=new EditText(this);e.setSingleLine(true);e.setText(s);e.setTextColor(fg);e.setBackgroundColor(panel);return e;}
@@ -188,10 +191,32 @@ public class MainActivity extends Activity {
     }
     double num(EditText e){try{return Double.parseDouble(e.getText().toString());}catch(Exception ex){return 0;}}
     void eventPanel(LinearLayout root){
-        root.addView(label("Khối sự kiện No-code",18,fg,true));root.addView(label("Điều kiện kích hoạt → Hành động",12,muted,false));
-        JSONArray a=project.optJSONArray("events");if(a!=null)for(int i=0;i<a.length();i++){int idx=i;JSONObject e=a.optJSONObject(i);TextView t=card("🟩 KHI "+e.optString("trigger")+"\n🟦 LÀM "+e.optString("action"));root.addView(t);t.setOnLongClickListener(v->{new AlertDialog.Builder(this).setMessage("Xóa khối này?").setNegativeButton("Hủy",null).setPositiveButton("Xóa",(d,w)->{project.optJSONArray("events").remove(idx);save();editor();}).show();return true;});}
-        root.addView(btn("+ Thêm sự kiện",()->{String[] presets={"Khi bắt đầu cảnh → Đặt Score = 0","Khi Player chạm Coin → Tăng Score thêm 1","Khi bấm nút Nhảy → Cho Player nhảy","Mỗi khung hình → Di chuyển Player","Khi Player chạm Enemy → Trừ 1 mạng"};new AlertDialog.Builder(this).setTitle("Chọn khối").setItems(presets,(d,i)->{try{String[] p=presets[i].split("→");project.getJSONArray("events").put(event(p[0].trim(),p[1].trim()));save();editor();}catch(Exception ignored){}}).show();}));
-        root.addView(label("Một số sự kiện đã chạy được trong chế độ thử: bắt đầu cảnh, mỗi khung hình, nhảy, chạm Coin/Enemy, điểm, mạng và ẩn/hiện Coin. Các hành động chưa được nhận diện vẫn được lưu nhưng chưa tự thực thi.",12,muted,false));
+        root.addView(label("Khối sự kiện No-code",18,fg,true));
+        root.addView(label("Chạm vào một khối để sửa điều kiện/hành động. Nhấn giữ để xóa.",12,muted,false));
+        JSONArray a=project.optJSONArray("events");
+        if(a!=null)for(int i=0;i<a.length();i++){
+            int idx=i;JSONObject e=a.optJSONObject(i);
+            TextView t=card("🟩 KHI "+e.optString("trigger")+"\\n🟦 LÀM "+e.optString("action"));
+            root.addView(t);t.setOnClickListener(v->editEvent(idx));
+            t.setOnLongClickListener(v->{new AlertDialog.Builder(this).setMessage("Xóa khối này?").setNegativeButton("Hủy",null).setPositiveButton("Xóa",(d,w)->{project.optJSONArray("events").remove(idx);save();editor();}).show();return true;});
+        }
+        root.addView(btn("+ Thêm sự kiện",()->editEvent(-1)));
+        root.addView(label("Đang hỗ trợ chạy thử: bắt đầu cảnh, mỗi khung hình, chạm Coin/Enemy, nút nhảy, đặt/tăng biến, ẩn/hiện Coin, di chuyển và trừ mạng. Các khối khác có thể được lưu nhưng chưa thực thi.",12,muted,false));
+    }
+    void editEvent(int index){
+        JSONArray list=project.optJSONArray("events");
+        if(list==null){list=new JSONArray();try{project.put("events",list);}catch(Exception ignored){}}
+        JSONObject old=index>=0&&index<list.length()?list.optJSONObject(index):new JSONObject();
+        Spinner trigger=new Spinner(this),action=new Spinner(this);
+        trigger.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,triggerChoices));
+        action.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,actionChoices));
+        if(old!=null){for(int i=0;i<triggerChoices.length;i++)if(triggerChoices[i].equals(old.optString("trigger")))trigger.setSelection(i);for(int i=0;i<actionChoices.length;i++)if(actionChoices[i].equals(old.optString("action")))action.setSelection(i);}
+        LinearLayout box=new LinearLayout(this);box.setOrientation(1);box.setPadding(dp(12),dp(8),dp(12),dp(8));
+        box.addView(label("KHI — Điều kiện",13,muted,true));box.addView(trigger);
+        box.addView(label("LÀM — Hành động",13,muted,true));box.addView(action);
+        new AlertDialog.Builder(this).setTitle(index<0?"Tạo sự kiện":"Sửa sự kiện").setView(box).setNegativeButton("Hủy",null).setPositiveButton("Lưu",(d,w)->{
+            try{JSONObject e=new JSONObject();e.put("trigger",trigger.getSelectedItem().toString());e.put("action",action.getSelectedItem().toString());if(index>=0&&index<list.length())list.put(index,e);else list.put(e);save();editor();}catch(Exception ex){toast("Không lưu được sự kiện");}
+        }).show();
     }
     void apkNotice(){new AlertDialog.Builder(this).setTitle("Xuất APK").setMessage("Chức năng đóng gói APK của game người dùng chưa được tích hợp ở bản nền tảng này. Hiện có thể lưu dự án ZIP ngoại tuyến. Bộ xuất APK trực tiếp là một cột mốc kỹ thuật tiếp theo, không phải tính năng đã hoàn thành.").setPositiveButton("Xuất ZIP", (d,w)->exportZip()).setNegativeButton("Đóng",null).show();}
     void exportZip(){Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);i.addCategory(Intent.CATEGORY_OPENABLE);i.setType("application/zip");i.putExtra(Intent.EXTRA_TITLE,safe(project.optString("name","Game"))+".zip");try{startActivityForResult(i,EXPORT_ZIP);}catch(Exception e){toast("Không mở được trình chọn file");}}
