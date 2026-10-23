@@ -223,15 +223,43 @@ public class MainActivity extends Activity {
         root.addView(label("Đối tượng trong cảnh",18,fg,true));JSONArray a=objects();
         for(int i=0;i<a.length();i++){int idx=i;JSONObject o=a.optJSONObject(i);TextView t=card((i==selected?"● ":"○ ")+o.optString("name")+"  •  "+o.optString("type")+"\nX="+(int)o.optDouble("x")+"  Y="+(int)o.optDouble("y"));root.addView(t);t.setOnClickListener(v->{selected=idx;editor();});}
         root.addView(btn("+ Thêm đối tượng",()->new AlertDialog.Builder(this).setTitle("Loại đối tượng").setItems(new String[]{"Nhân vật","Enemy","Khối 3D","Coin","Nền sàn"},(d,w)->{if(w==0)add("Player","player",Color.BLUE);if(w==1)add("Enemy","enemy",Color.RED);if(w==2)add("Cube","cube",Color.rgb(110,130,255));if(w==3)add("Coin","coin",Color.YELLOW);if(w==4)add("Platform","platform",Color.GREEN);}).show()));
-        root.addView(btn("Gán ảnh từ thư viện",this::importImage));root.addView(btn("Sửa thuộc tính",this::editObject));root.addView(btn("Xóa đối tượng",()->{if(objects().length()>0){objects().remove(selected);selected=Math.max(0,selected-1);save();editor();}}));
+        root.addView(btn("Gán ảnh từ thư viện",this::importImage));
+        root.addView(btn("Sửa thuộc tính",this::editObject));
+        root.addView(btn("Nhân bản đối tượng",this::duplicateSelected));
+        root.addView(btn("Xóa đối tượng",()->{if(objects().length()>0){objects().remove(selected);selected=Math.max(0,selected-1);save();editor();}}));
     }
     EditText field(String s){EditText e=new EditText(this);e.setSingleLine(true);e.setText(s);e.setTextColor(fg);e.setBackgroundColor(panel);return e;}
     void editObject(){
-        JSONArray a=objects();if(a.length()==0)return;selected=Math.min(selected,a.length()-1);JSONObject o=a.optJSONObject(selected);
+        JSONArray a=objects();if(a.length()==0)return;selected=Math.max(0,Math.min(selected,a.length()-1));JSONObject o=a.optJSONObject(selected);
         LinearLayout box=new LinearLayout(this);box.setPadding(dp(10),dp(6),dp(10),dp(6));box.setOrientation(1);
         EditText n=field(o.optString("name"));EditText x=field(""+(int)o.optDouble("x"));EditText y=field(""+(int)o.optDouble("y"));EditText w=field(""+(int)o.optDouble("w"));EditText h=field(""+(int)o.optDouble("h"));
-        for(Object[] pair:new Object[][]{{"Tên",n},{"X",x},{"Y",y},{"Rộng",w},{"Cao",h}}){box.addView(label((String)pair[0],12,muted,false));box.addView((View)pair[1]);}
-        new AlertDialog.Builder(this).setTitle("Thuộc tính").setView(box).setNegativeButton("Hủy",null).setPositiveButton("Lưu",(d,z)->{try{o.put("name",n.getText().toString());o.put("x",num(x));o.put("y",num(y));o.put("w",num(w));o.put("h",num(h));save();editor();}catch(Exception ignored){}}).show();
+        String[] types={"player","enemy","cube","coin","platform"};
+        String[] typeLabels={"Nhân vật (Player)","Kẻ địch (Enemy)","Khối 3D (Cube)","Vật phẩm (Coin)","Nền sàn (Platform)"};
+        Spinner type=new Spinner(this);
+        type.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,typeLabels));
+        String currentType=o.optString("type","cube");
+        for(int i=0;i<types.length;i++)if(types[i].equalsIgnoreCase(currentType)){type.setSelection(i);break;}
+        String[] colorLabels={"Xanh dương","Đỏ","Tím","Vàng","Xanh lá","Trắng"};
+        int[] colors={Color.rgb(40,116,240),Color.RED,Color.rgb(150,80,230),Color.YELLOW,Color.rgb(56,174,99),Color.WHITE};
+        Spinner color=new Spinner(this);
+        color.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,colorLabels));
+        int oldColor=o.optInt("color",Color.BLUE), colorIndex=0;
+        for(int i=0;i<colors.length;i++)if(colors[i]==oldColor){colorIndex=i;break;}
+        color.setSelection(colorIndex);
+        for(Object[] pair:new Object[][]{{"Tên",n},{"Loại đối tượng",type},{"Màu",color},{"Vị trí X",x},{"Vị trí Y",y},{"Chiều rộng",w},{"Chiều cao",h}}){box.addView(label((String)pair[0],12,muted,false));box.addView((View)pair[1]);}
+        new AlertDialog.Builder(this).setTitle("Thuộc tính đối tượng").setView(box).setNegativeButton("Hủy",null).setPositiveButton("Lưu",(d,z)->{try{o.put("name",n.getText().toString().trim().isEmpty()?currentType:n.getText().toString().trim());o.put("type",types[type.getSelectedItemPosition()]);o.put("color",colors[color.getSelectedItemPosition()]);o.put("x",num(x));o.put("y",num(y));o.put("w",Math.max(1,num(w)));o.put("h",Math.max(1,num(h)));spriteCache.clear();save();editor();}catch(Exception ex){toast("Không lưu được thuộc tính");}}).show();
+    }
+    void duplicateSelected(){
+        JSONArray a=objects();if(a.length()==0)return;
+        try{
+            selected=Math.max(0,Math.min(selected,a.length()-1));
+            JSONObject source=a.optJSONObject(selected);
+            JSONObject copy=new JSONObject(source.toString());
+            copy.put("name",source.optString("name","Object")+" copy");
+            copy.put("x",Math.min(900,source.optDouble("x")+24));
+            copy.put("y",Math.min(500,source.optDouble("y")+24));
+            a.put(copy);selected=a.length()-1;save();editor();toast("Đã nhân bản đối tượng");
+        }catch(Exception ex){toast("Không nhân bản được đối tượng");}
     }
     double num(EditText e){try{return Double.parseDouble(e.getText().toString());}catch(Exception ex){return 0;}}
     void eventPanel(LinearLayout root){
