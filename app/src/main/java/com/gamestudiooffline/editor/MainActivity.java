@@ -77,6 +77,7 @@ public class MainActivity extends Activity {
     void toast(String s){Toast.makeText(this,s,Toast.LENGTH_LONG).show();}
     JSONObject obj(String n,String type,double x,double y,double w,double h,int c)throws Exception{JSONObject o=new JSONObject();o.put("name",n);o.put("type",type);o.put("x",x);o.put("y",y);o.put("w",w);o.put("h",h);o.put("color",c);return o;}
     JSONObject event(String trigger,String action)throws Exception{JSONObject e=new JSONObject();e.put("trigger",trigger);e.put("action",action);return e;}
+    JSONObject variable(String name,double value)throws Exception{JSONObject v=new JSONObject();v.put("name",name);v.put("value",value);return v;}
 
     void home(){
         preview=false;LinearLayout root=col();
@@ -101,7 +102,9 @@ public class MainActivity extends Activity {
             JSONArray os=new JSONArray();
             if(dimension.equals("2D")){os.put(obj("Player","player",130,350,48,60,Color.rgb(40,132,255)));os.put(obj("Ground","platform",0,465,960,75,Color.rgb(56,174,99)));os.put(obj("Coin","coin",500,340,32,32,Color.YELLOW));}
             else{os.put(obj("Camera","camera",0,0,0,0,Color.WHITE));os.put(obj("Light","light",0,0,0,0,Color.YELLOW));os.put(obj("Cube","cube",430,260,90,90,Color.rgb(52,138,255)));os.put(obj("Cube 2","cube",580,330,65,65,Color.rgb(255,128,70)));}
-            project.put("objects",os);JSONArray ev=new JSONArray();ev.put(event("Khi bắt đầu cảnh","Đặt biến Score = 0"));
+            project.put("objects",os);
+            JSONArray vars=new JSONArray();vars.put(variable("Score",0));vars.put(variable("Lives",3));vars.put(variable("Timer",0));project.put("variables",vars);
+            JSONArray ev=new JSONArray();ev.put(event("Khi bắt đầu cảnh","Đặt biến Score = 0"));
             ev.put(event(dimension.equals("2D")?"Khi Player chạm Coin":"Khi bắt đầu cảnh",dimension.equals("2D")?"Tăng Score thêm 1 và ẩn Coin":"Đặt Camera nhìn vào Cube"));project.put("events",ev);
             activeFile=new File(dir(),safe(n)+".gsproj");tab=dimension;save();selected=0;editor();
         }catch(Exception e){toast("Lỗi tạo dự án: "+e.getMessage());}
@@ -125,6 +128,8 @@ public class MainActivity extends Activity {
 
     void startRuntime(){
         runtimeVars.clear();runtimeVars.put("Score",0d);runtimeVars.put("Lives",3d);runtimeVars.put("Timer",0d);
+        JSONArray savedVars=project.optJSONArray("variables");
+        if(savedVars!=null)for(int i=0;i<savedVars.length();i++){JSONObject v=savedVars.optJSONObject(i);if(v!=null){String n=v.optString("name","").trim();if(!n.isEmpty())putRuntimeVar(n,v.optDouble("value",0));}}
         hiddenRuntimeObjects.clear();previousContacts.clear();eventTimerLastFired.clear();eventConditionWasTrue.clear();
         runtimeScore=0;runtimeLives=3;runtimeGravity=950;runtimeMoveSpeed=240;runtimeJumpStrength=430;runtimeTimeScale=1;
         runtimePlayerVY=0;moveAxis=0;jumpRequested=false;runtimeGrounded=false;
@@ -327,7 +332,7 @@ public class MainActivity extends Activity {
         top.addView(label(project.optString("name","Game"),16,fg,true),new LinearLayout.LayoutParams(0,-2,1));
         top.addView(btn("Lưu",()->{save();toast("Đã lưu ngoại tuyến");}));
         top.addView(btn(preview?"Dừng":"Chạy",()->{if(!preview)startRuntime();else stopRuntime();preview=!preview;editor();}));root.addView(top);
-        LinearLayout tabs=row();for(String t:new String[]{"2D","3D","Đối tượng","Sự kiện"})tabs.addView(btn(t,()->{tab=t;editor();}));root.addView(scroll(tabs));
+        LinearLayout tabs=row();for(String t:new String[]{"2D","3D","Đối tượng","Sự kiện","Biến"})tabs.addView(btn(t,()->{tab=t;editor();}));root.addView(scroll(tabs));
         if(preview){
             boolean preview3D=project.optString("dimension","2D").equals("3D");
             root.addView(label("CHẠY THỬ • Sự kiện đang được thực thi",12,Color.GREEN,true));
@@ -341,7 +346,7 @@ public class MainActivity extends Activity {
             root.addView(new SceneView(false,three),new LinearLayout.LayoutParams(-1,dp(320)));
             LinearLayout tools=row();tools.addView(btn("+ Player",()->add("Player","player",Color.BLUE)));tools.addView(btn("+ Enemy",()->add("Enemy","enemy",Color.RED)));tools.addView(btn("+ Khối",()->add("Cube","cube",Color.rgb(110,130,255))));tools.addView(btn("+ Coin",()->add("Coin","coin",Color.YELLOW)));tools.addView(btn("+ Nền",()->add("Platform","platform",Color.GREEN)));root.addView(scroll(tools));
             root.addView(label("Đang chọn: "+selectedName(),14,fg,true));root.addView(btn("Sửa thuộc tính",this::editObject));root.addView(btn("Xuất dự án ZIP",this::exportZip));root.addView(btn("Xuất APK",this::apkNotice));
-        }else if(tab.equals("Đối tượng"))objectPanel(root);else eventPanel(root);
+        }else if(tab.equals("Đối tượng"))objectPanel(root);else if(tab.equals("Sự kiện"))eventPanel(root);else variablePanel(root);
         setContentView(scroll(root));
     }
     String selectedName(){JSONArray a=objects();if(a.length()==0)return "(không có)";selected=Math.max(0,Math.min(selected,a.length()-1));return a.optJSONObject(selected).optString("name","Object");}
@@ -388,6 +393,45 @@ public class MainActivity extends Activity {
         }catch(Exception ex){toast("Không nhân bản được đối tượng");}
     }
     double num(EditText e){try{return Double.parseDouble(e.getText().toString());}catch(Exception ex){return 0;}}
+    JSONArray projectVariables(){
+        JSONArray a=project.optJSONArray("variables");
+        if(a==null){a=new JSONArray();try{project.put("variables",a);}catch(Exception ignored){}}
+        return a;
+    }
+    void variablePanel(LinearLayout root){
+        root.addView(label("Biến toàn cục",18,fg,true));
+        root.addView(label("Dùng biến để lưu điểm, máu, tiền, cấp độ, bộ đếm và trạng thái. Biến được dùng trong điều kiện sự kiện và lệnh tùy chỉnh.",12,muted,false));
+        JSONArray a=projectVariables();
+        for(int i=0;i<a.length();i++){
+            JSONObject v=a.optJSONObject(i);if(v==null)continue;int index=i;
+            TextView card=card(v.optString("name","Variable")+" = "+v.optString("value","0")+"\nChạm để sửa • Nhấn giữ để xóa");
+            root.addView(card);
+            card.setOnClickListener(view->editVariable(index));
+            card.setOnLongClickListener(view->{new AlertDialog.Builder(this).setMessage("Xóa biến "+v.optString("name")+"?").setNegativeButton("Hủy",null).setPositiveButton("Xóa",(d,w)->{projectVariables().remove(index);save();editor();}).show();return true;});
+        }
+        root.addView(btn("+ Tạo biến",()->editVariable(-1)));
+        root.addView(label("Ví dụ: tạo EnemyHP = 100; khi EnemyHP <= 0 thì dùng lệnh destroy Enemy hoặc hide Enemy. Khi nhặt tiền: add Money 5. Khi tăng điểm: set Score = Score + 10 (hỗ trợ sau khi bật công thức trong lệnh).",12,muted,false));
+    }
+    void editVariable(int index){
+        JSONArray a=projectVariables();
+        JSONObject old=index>=0&&index<a.length()?a.optJSONObject(index):null;
+        EditText name=field(old==null?"":old.optString("name",""));
+        EditText value=field(old==null?"0":Double.toString(old.optDouble("value",0)));
+        name.setHint("Tên biến, ví dụ EnemyHP");
+        value.setHint("Giá trị số ban đầu");
+        LinearLayout box=new LinearLayout(this);box.setOrientation(1);box.setPadding(dp(12),dp(8),dp(12),dp(8));
+        box.addView(label("Tên biến (chữ, số, dấu gạch dưới; không bắt đầu bằng số)",12,muted,false));box.addView(name);
+        box.addView(label("Giá trị ban đầu",12,muted,false));box.addView(value);
+        new AlertDialog.Builder(this).setTitle(old==null?"Tạo biến":"Sửa biến").setView(box).setNegativeButton("Hủy",null).setPositiveButton("Lưu",(d,w)->{
+            String n=name.getText().toString().trim();double v;
+            try{v=Double.parseDouble(value.getText().toString().trim());}catch(Exception ex){toast("Giá trị phải là số");return;}
+            if(!n.matches("[A-Za-z_][A-Za-z0-9_]*")){toast("Tên biến không hợp lệ");return;}
+            if(n.equalsIgnoreCase("Player")||n.equalsIgnoreCase("Gravity")||n.equalsIgnoreCase("MoveSpeed")||n.equalsIgnoreCase("JumpStrength")||n.equalsIgnoreCase("TimeScale")){toast("Tên này dành cho thuộc tính hệ thống");return;}
+            for(int j=0;j<a.length();j++){if(j==index)continue;JSONObject other=a.optJSONObject(j);if(other!=null&&other.optString("name","").equalsIgnoreCase(n)){toast("Tên biến đã tồn tại");return;}}
+            try{JSONObject saved=old==null?new JSONObject():old;saved.put("name",n);saved.put("value",v);if(old==null)a.put(saved);save();editor();toast("Đã lưu biến "+n);}catch(Exception ex){toast("Không lưu được biến");}
+        }).show();
+    }
+
     void eventPanel(LinearLayout root){
         root.addView(label("Khối sự kiện No-code",18,fg,true));
         root.addView(label("Chạm vào một khối để sửa điều kiện/hành động. Nhấn giữ để xóa.",12,muted,false));
