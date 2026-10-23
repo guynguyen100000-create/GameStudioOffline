@@ -160,9 +160,10 @@ public class MainActivity extends Activity {
         top.addView(btn(preview?"Dừng":"Chạy",()->{if(!preview)startRuntime();else stopRuntime();preview=!preview;editor();}));root.addView(top);
         LinearLayout tabs=row();for(String t:new String[]{"2D","3D","Đối tượng","Sự kiện"})tabs.addView(btn(t,()->{tab=t;editor();}));root.addView(scroll(tabs));
         if(preview){
+            boolean preview3D=project.optString("dimension","2D").equals("3D");
             root.addView(label("CHẠY THỬ • Sự kiện đang được thực thi",12,Color.GREEN,true));
-            root.addView(new SceneView(true,tab.equals("3D")),new LinearLayout.LayoutParams(-1,dp(330)));
-            if(!tab.equals("3D")){LinearLayout controls=row();controls.addView(holdButton("◀", -1));controls.addView(btn("NHẢY",()->{jumpRequested=true;}));controls.addView(holdButton("▶", 1));root.addView(controls);}
+            root.addView(new SceneView(true,preview3D),new LinearLayout.LayoutParams(-1,dp(330)));
+            if(!preview3D){LinearLayout controls=row();controls.addView(holdButton("◀", -1));controls.addView(btn("NHẢY",()->{jumpRequested=true;}));controls.addView(holdButton("▶", 1));root.addView(controls);}
             root.addView(label("Điểm: "+runtimeScore+"     Mạng: "+runtimeLives,16,fg,true));
             root.addView(btn("Quay lại chỉnh sửa",()->{stopRuntime();preview=false;editor();}));
         }
@@ -204,8 +205,9 @@ public class MainActivity extends Activity {
         root.addView(label("Đang hỗ trợ chạy thử: bắt đầu cảnh, mỗi khung hình, chạm Coin/Enemy, nút nhảy, đặt/tăng biến, ẩn/hiện Coin, di chuyển và trừ mạng. Các khối khác có thể được lưu nhưng chưa thực thi.",12,muted,false));
     }
     void editEvent(int index){
-        JSONArray list=project.optJSONArray("events");
-        if(list==null){list=new JSONArray();try{project.put("events",list);}catch(Exception ignored){}}
+        JSONArray existingEvents=project.optJSONArray("events");
+        if(existingEvents==null){existingEvents=new JSONArray();try{project.put("events",existingEvents);}catch(Exception ignored){}}
+        final JSONArray list=existingEvents;
         JSONObject old=index>=0&&index<list.length()?list.optJSONObject(index):new JSONObject();
         Spinner trigger=new Spinner(this),action=new Spinner(this);
         trigger.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,triggerChoices));
