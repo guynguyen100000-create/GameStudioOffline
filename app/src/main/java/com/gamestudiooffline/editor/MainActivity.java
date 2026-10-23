@@ -220,6 +220,13 @@ public class MainActivity extends Activity {
         return key;
     }
     Double resolveValue(String token){
+        if(token==null)return null;
+        String s=token.trim();
+        Double simple=resolveSimpleValue(s);if(simple!=null)return simple;
+        try{ExpressionParser parser=new ExpressionParser(s);double value=parser.expression();parser.spaces();if(parser.pos==s.length()&&Double.isFinite(value))return value;}catch(Exception ignored){}
+        return null;
+    }
+    Double resolveSimpleValue(String token){
         String s=token.trim();
         try{return Double.parseDouble(s);}catch(Exception ignored){}
         if("Player.X".equalsIgnoreCase(s))return runtimePlayerX;
@@ -228,6 +235,26 @@ public class MainActivity extends Activity {
         if("Timer".equalsIgnoreCase(s))return Math.max(0,(System.currentTimeMillis()-runtimeStartMillis)/1000d);
         for(Map.Entry<String,Double> entry:runtimeVars.entrySet())if(entry.getKey().equalsIgnoreCase(s))return entry.getValue();
         return null;
+    }
+    class ExpressionParser{
+        final String s;int pos=0;
+        ExpressionParser(String input){s=input;}
+        void spaces(){while(pos<s.length()&&Character.isWhitespace(s.charAt(pos)))pos++;}
+        boolean take(char c){spaces();if(pos<s.length()&&s.charAt(pos)==c){pos++;return true;}return false;}
+        double expression(){double v=term();while(true){if(take('+'))v+=term();else if(take('-'))v-=term();else return v;}}
+        double term(){double v=factor();while(true){if(take('*'))v*=factor();else if(take('/')){double d=factor();if(Math.abs(d)<1e-12)throw new ArithmeticException("division by zero");v/=d;}else if(take('%')){double d=factor();if(Math.abs(d)<1e-12)throw new ArithmeticException("division by zero");v%=d;}else return v;}}
+        double factor(){
+            spaces();if(take('+'))return factor();if(take('-'))return -factor();
+            if(take('(')){double v=expression();if(!take(')'))throw new IllegalArgumentException("missing )");return v;}
+            spaces();int start=pos;
+            if(pos<s.length()&&(Character.isDigit(s.charAt(pos))||s.charAt(pos)=='.')){
+                boolean dot=false;while(pos<s.length()){char ch=s.charAt(pos);if(Character.isDigit(ch)){pos++;continue;}if(ch=='.'&&!dot){dot=true;pos++;continue;}break;}
+                return Double.parseDouble(s.substring(start,pos));
+            }
+            while(pos<s.length()){char ch=s.charAt(pos);if(Character.isLetterOrDigit(ch)||ch=='_'||ch=='.')pos++;else break;}
+            if(start==pos)throw new IllegalArgumentException("expected value");
+            Double value=resolveSimpleValue(s.substring(start,pos));if(value==null)throw new IllegalArgumentException("unknown variable");return value;
+        }
     }
     void putRuntimeVar(String name,double value){
         String key=name.trim();for(String existing:runtimeVars.keySet())if(existing.equalsIgnoreCase(key)){key=existing;break;}runtimeVars.put(key,value);
@@ -245,13 +272,13 @@ public class MainActivity extends Activity {
     void runAction(String action){
         String low=action.toLowerCase(Locale.ROOT);
         String command=action.trim();
-        Matcher customSet=Pattern.compile("(?i)^set\\s+([A-Za-z_][A-Za-z0-9_.]*)\\s*=\\s*(-?\\d+(?:\\.\\d+)?)$").matcher(command);
-        Matcher customAdd=Pattern.compile("(?i)^add\\s+([A-Za-z_][A-Za-z0-9_]*)\\s+(-?\\d+(?:\\.\\d+)?)$").matcher(command);
-        Matcher customSub=Pattern.compile("(?i)^subtract\\s+([A-Za-z_][A-Za-z0-9_]*)\\s+(-?\\d+(?:\\.\\d+)?)$").matcher(command);
+        Matcher customSet=Pattern.compile("(?i)^set\\s+([A-Za-z_][A-Za-z0-9_.]*)\\s*=\\s*(.+)$").matcher(command);
+        Matcher customAdd=Pattern.compile("(?i)^add\\s+([A-Za-z_][A-Za-z0-9_]*)\\s+(.+)$").matcher(command);
+        Matcher customSub=Pattern.compile("(?i)^subtract\\s+([A-Za-z_][A-Za-z0-9_]*)\\s+(.+)$").matcher(command);
         Matcher teleport=Pattern.compile("(?i)^teleport\\s+player\\s+(-?\\d+(?:\\.\\d+)?)\\s+(-?\\d+(?:\\.\\d+)?)$").matcher(command);
         Matcher hide=Pattern.compile("(?i)^(hide|show|destroy)\\s+(.+)$").matcher(command);
         if(customSet.matches()){
-            String key=customSet.group(1);double value=Double.parseDouble(customSet.group(2));
+            String key=customSet.group(1);Double calculated=resolveValue(customSet.group(2));if(calculated==null)return;double value=calculated;
             if(key.equalsIgnoreCase("Player.X"))runtimePlayerX=value;
             else if(key.equalsIgnoreCase("Player.Y"))runtimePlayerY=value;
             else if(key.equalsIgnoreCase("Player.VY"))runtimePlayerVY=value;
@@ -263,14 +290,14 @@ public class MainActivity extends Activity {
             updateHudValues();return;
         }
         if(customAdd.matches()||customSub.matches()){
-            Matcher m=customAdd.matches()?customAdd:customSub;String key=m.group(1);double value=Double.parseDouble(m.group(2));
+            Matcher m=customAdd.matches()?customAdd:customSub;String key=m.group(1);Double operand=resolveValue(m.group(2));if(operand==null)return;double value=operand;
             putRuntimeVar(key,resolveValue(key)==null?0:resolveValue(key)+(m==customAdd?value:-value));updateHudValues();return;
         }
         if(teleport.matches()){runtimePlayerX=Double.parseDouble(teleport.group(1));runtimePlayerY=Double.parseDouble(teleport.group(2));runtimePlayerVY=0;updateHudValues();return;}
         if(hide.matches()){String verb=hide.group(1).toLowerCase(Locale.ROOT),target=hide.group(2);hideMatchingObjects(target,!verb.equals("show"));updateHudValues();return;}
         if(command.equalsIgnoreCase("respawn Player")||command.equalsIgnoreCase("respawn player")){runtimePlayerX=runtimeSpawnX;runtimePlayerY=runtimeSpawnY;runtimePlayerVY=0;runtimeGrounded=false;updateHudValues();return;}
-        Matcher set=Pattern.compile("(?i).*đặt(?:\\s+biến)?\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*(-?\\d+(?:\\.\\d+)?).*").matcher(action);
-        if(set.matches()){try{putRuntimeVar(set.group(1),Double.parseDouble(set.group(2)));}catch(Exception ignored){}}
+        Matcher set=Pattern.compile("(?i).*đặt(?:\\s+biến)?\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*([A-Za-z0-9_ .+*/()%\\-]+).*").matcher(action);
+        if(set.matches()){try{Double value=resolveValue(set.group(2));if(value!=null)putRuntimeVar(set.group(1),value);}catch(Exception ignored){}}
         Matcher inc=Pattern.compile("(?i).*tăng\\s+([A-Za-z_][A-Za-z0-9_]*)\\s+thêm\\s+(-?\\d+(?:\\.\\d+)?).*").matcher(action);
         Matcher dec=Pattern.compile("(?i).*giảm\\s+([A-Za-z_][A-Za-z0-9_]*)\\s+đi\\s+(-?\\d+(?:\\.\\d+)?).*").matcher(action);
         if(inc.matches()){try{String key=inc.group(1);putRuntimeVar(key,(resolveValue(key)==null?0:resolveValue(key))+Double.parseDouble(inc.group(2)));}catch(Exception ignored){}}
@@ -410,7 +437,7 @@ public class MainActivity extends Activity {
             card.setOnLongClickListener(view->{new AlertDialog.Builder(this).setMessage("Xóa biến "+v.optString("name")+"?").setNegativeButton("Hủy",null).setPositiveButton("Xóa",(d,w)->{projectVariables().remove(index);save();editor();}).show();return true;});
         }
         root.addView(btn("+ Tạo biến",()->editVariable(-1)));
-        root.addView(label("Ví dụ: tạo EnemyHP = 100; khi EnemyHP <= 0 thì dùng lệnh destroy Enemy hoặc hide Enemy. Khi nhặt tiền: add Money 5. Khi tăng điểm: set Score = Score + 10 (hỗ trợ sau khi bật công thức trong lệnh).",12,muted,false));
+        root.addView(label("Ví dụ: tạo EnemyHP = 100; điều kiện EnemyHP <= 0; lệnh add Money 5, set Score = Score + 10, set EnemyHP = EnemyHP - 25. Hỗ trợ +, -, *, /, %, dấu ngoặc và các biến đã tạo.",12,muted,false));
     }
     void editVariable(int index){
         JSONArray a=projectVariables();
