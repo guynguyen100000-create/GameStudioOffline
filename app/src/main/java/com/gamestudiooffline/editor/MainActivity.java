@@ -398,6 +398,7 @@ public class MainActivity extends Activity {
         try{return Double.parseDouble(s);}catch(Exception ignored){}
         if("Player.X".equalsIgnoreCase(s))return runtimePlayerX;
         if("Player.Y".equalsIgnoreCase(s))return runtimePlayerY;
+        if("Player.VX".equalsIgnoreCase(s))return runtimePlayerVX;
         Matcher objectCoordinate=Pattern.compile("^([A-Za-z_][A-Za-z0-9_]*)\\.(X|Y|VX|VY|Health)$",Pattern.CASE_INSENSITIVE).matcher(s);
         if(objectCoordinate.matches()){JSONObject o=findObject(resolveLastHitTarget(objectCoordinate.group(1)));if(o!=null){String property=objectCoordinate.group(2);if(property.equalsIgnoreCase("Health"))return runtimeObjectHealthValue(o);if(property.equalsIgnoreCase("VX"))return runtimeObjectVelocity(o,true);if(property.equalsIgnoreCase("VY"))return runtimeObjectVelocity(o,false);return runtimeObjectCoordinate(o,property.equalsIgnoreCase("X"));}}
         if("Player.VY".equalsIgnoreCase(s))return runtimePlayerVY;
@@ -464,6 +465,7 @@ public class MainActivity extends Activity {
         }
         if(key.equalsIgnoreCase("Player.X"))runtimePlayerX=value;
         else if(key.equalsIgnoreCase("Player.Y"))runtimePlayerY=value;
+        else if(key.equalsIgnoreCase("Player.VX"))runtimePlayerVX=value;
         else if(key.equalsIgnoreCase("Player.VY"))runtimePlayerVY=value;
         else if(key.equalsIgnoreCase("Gravity"))runtimeGravity=Math.max(0,value);
         else if(key.equalsIgnoreCase("MoveSpeed"))runtimeMoveSpeed=Math.max(0,value);
@@ -630,10 +632,10 @@ public class MainActivity extends Activity {
             if(e.optString("action","").trim().isEmpty()&&e.optString("customAction","").trim().isEmpty())warnings.add("• Khối sự kiện "+(i+1)+" chưa có hành động.");
         }
         StringBuilder report=new StringBuilder();
-        if(errors.isEmpty())report.append("✓ Không tìm thấy lỗi cấu trúc cơ bản.\\n");
-        else{report.append("LỖI CẦN SỬA (").append(errors.size()).append("):\\n");for(String e:errors)report.append(e).append("\\n");}
-        if(!warnings.isEmpty()){report.append("\\nLƯU Ý (").append(warnings.size()).append("):\\n");for(String w:warnings)report.append(w).append("\\n");}
-        report.append("\\nKiểm tra này rà soát cấu trúc dự án, không thay thế việc chạy thử game trên thiết bị.");
+        if(errors.isEmpty())report.append("✓ Không tìm thấy lỗi cấu trúc cơ bản.\n");
+        else{report.append("LỖI CẦN SỬA (").append(errors.size()).append("):\n");for(String e:errors)report.append(e).append("\n");}
+        if(!warnings.isEmpty()){report.append("\nLƯU Ý (").append(warnings.size()).append("):\n");for(String w:warnings)report.append(w).append("\n");}
+        report.append("\nKiểm tra này rà soát cấu trúc dự án, không thay thế việc chạy thử game trên thiết bị.");
         new AlertDialog.Builder(this).setTitle(errors.isEmpty()?"Kiểm tra dự án":"Phát hiện vấn đề").setMessage(report.toString()).setPositiveButton("Đóng",null).show();
     }
 
