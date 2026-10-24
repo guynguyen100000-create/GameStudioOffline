@@ -118,25 +118,23 @@ public class MainActivity extends Activity {
         JSONObject e=event(trigger,action);e.put("customAction",customAction==null?"":customAction);e.put("condition",condition==null?"":condition);return e;
     }
     void showTemplatePicker(){
-        new AlertDialog.Builder(this).setTitle("Chọn mẫu game 2D").setItems(new String[]{"Đi cảnh cơ bản","Bắn súng 2D","RPG sinh tồn cơ bản"},(d,which)->{
-            if(which==0)create("2D");else if(which==1)createTemplate("shooter");else createTemplate("rpg");
+        new AlertDialog.Builder(this).setTitle("Chọn mẫu game 2D").setItems(new String[]{"Đi cảnh cơ bản","Bắn súng 2D","RPG sinh tồn cơ bản","Tower Defense cơ bản"},(d,which)->{
+            if(which==0)create("2D");else if(which==1)createTemplate("shooter");else if(which==2)createTemplate("rpg");else createTemplate("tower");
         }).setNegativeButton("Hủy",null).show();
     }
     void createTemplate(String kind){
-        String n=nameBox.getText().toString().trim();boolean shooter="shooter".equals(kind);
-        if(n.isEmpty())n=shooter?"ShooterStarter":"RPGStarter";
+        String n=nameBox.getText().toString().trim();boolean shooter="shooter".equals(kind),tower="tower".equals(kind);
+        if(n.isEmpty())n=shooter?"ShooterStarter":tower?"TowerDefenseStarter":"RPGStarter";
         try{
             project=new JSONObject();project.put("schema",1);project.put("name",n);project.put("dimension","2D");project.put("width",960);project.put("height",540);
             JSONArray os=new JSONArray();
-            os.put(sceneObject("Player","player",75,350,48,60,Color.rgb(40,132,255),100,0,0));
+            if(!tower)os.put(sceneObject("Player","player",75,350,48,60,Color.rgb(40,132,255),100,0,0));
             os.put(sceneObject("Ground","platform",0,465,960,75,Color.rgb(56,174,99),100,0,0));
-            os.put(sceneObject("Enemy","enemy",shooter?610:570,380,48,55,Color.RED,100,0,0));
-            os.put(sceneObject("Enemy2","enemy",shooter?790:750,350,48,55,Color.rgb(220,75,80),100,0,0));
-            os.put(sceneObject("Coin","coin",320,405,30,30,Color.YELLOW,1,0,0));
-            os.put(sceneObject("Projectile","projectile",-120,-120,18,12,Color.YELLOW,1,0,0));
+            if(tower){os.put(sceneObject("Enemy","enemy",-120,350,44,44,Color.RED,100,0,0));os.put(sceneObject("Core","cube",830,350,70,70,Color.rgb(40,132,255),100,0,0));}
+            else{os.put(sceneObject("Enemy","enemy",shooter?610:570,380,48,55,Color.RED,100,0,0));os.put(sceneObject("Enemy2","enemy",shooter?790:750,350,48,55,Color.rgb(220,75,80),100,0,0));os.put(sceneObject("Coin","coin",320,405,30,30,Color.YELLOW,1,0,0));os.put(sceneObject("Projectile","projectile",-120,-120,18,12,Color.YELLOW,1,0,0));}
             project.put("objects",os);
-            JSONArray vars=new JSONArray();vars.put(variable("Score",0));vars.put(variable("Lives",3));vars.put(variable("Timer",0));
-            if(!shooter){vars.put(variable("Gold",0));vars.put(variable("Level",1));}
+            JSONArray vars=new JSONArray();vars.put(variable("Score",0));vars.put(variable("Lives",tower?10:3));vars.put(variable("Timer",0));
+            if(!shooter&&!tower){vars.put(variable("Gold",0));vars.put(variable("Level",1));}
             project.put("variables",vars);
             JSONArray ev=new JSONArray();
             ev.put(event("Khi bắt đầu cảnh","Đặt biến Score = 0"));
@@ -149,6 +147,11 @@ public class MainActivity extends Activity {
                 ev.put(event("Khi Player chạm Enemy","Trừ 10 máu Player"));
                 ev.put(event("Khi Player chạm Coin","Tăng Score thêm 1"));
                 ev.put(event("Khi Player chạm Coin","Ẩn Coin"));
+            }else if(tower){
+                ev.put(templateEvent("Mỗi 3 giây","Lệnh tùy chỉnh (xem ô bên dưới)","spawn Enemy 0 350 90 0",""));
+                ev.put(event("Mỗi 1 giây","Tăng Score thêm 1"));
+                ev.put(event("Khi Enemy chạm Cube","Loại bỏ Enemy vừa trúng"));
+                ev.put(event("Khi Enemy chạm Cube","Trừ 1 mạng"));
             }else{
                 ev.put(templateEvent("Khi bắt đầu cảnh","Lệnh tùy chỉnh (xem ô bên dưới)","follow Enemy Player 35",""));
                 ev.put(templateEvent("Khi bắt đầu cảnh","Lệnh tùy chỉnh (xem ô bên dưới)","follow Enemy2 Player 45",""));
@@ -161,7 +164,7 @@ public class MainActivity extends Activity {
             }
             project.put("events",ev);
             activeFile=new File(dir(),safe(n)+".gsproj");tab="2D";preview=false;selected=0;save();editor();
-            toast(shooter?"Đã tạo mẫu Bắn súng 2D":"Đã tạo mẫu RPG sinh tồn");
+            toast(shooter?"Đã tạo mẫu Bắn súng 2D":tower?"Đã tạo mẫu Tower Defense":"Đã tạo mẫu RPG sinh tồn");
         }catch(Exception e){toast("Không tạo được mẫu game: "+e.getMessage());}
     }
     int selected=0;
@@ -498,7 +501,7 @@ public class MainActivity extends Activity {
         if(player!=null&&runtimePlayerY+ph>=500){runtimePlayerY=500-ph;runtimePlayerVY=0;runtimeGrounded=true;}
         previousContacts.clear();previousContacts.addAll(currentContacts);
         runtimeScore=(int)Math.round(runtimeVars.getOrDefault("Score",0d));runtimeLives=(int)Math.round(runtimeVars.getOrDefault("Lives",3d));
-        JSONObject activePlayer=findPlayer();if(activePlayer!=null&&(runtimeObjectHealthValue(activePlayer)<=0||runtimeLives<=0||destroyedRuntimeObjects.contains(activePlayer.optString("name","Player")))){runtimeGameOver=true;moveAxis=0;runtimePlayerVX=0;runtimePlayerVY=0;jumpRequested=false;}
+        JSONObject activePlayer=findPlayer();if(runtimeLives<=0||(activePlayer!=null&&(runtimeObjectHealthValue(activePlayer)<=0||destroyedRuntimeObjects.contains(activePlayer.optString("name","Player"))))){runtimeGameOver=true;moveAxis=0;runtimePlayerVX=0;runtimePlayerVY=0;jumpRequested=false;}
     }
     Button holdButton(String text,int direction){
         Button b=btn(text,()->{});b.setOnTouchListener((v,e)->{if(e.getAction()==MotionEvent.ACTION_DOWN){moveAxis=direction;return true;}if(e.getAction()==MotionEvent.ACTION_UP||e.getAction()==MotionEvent.ACTION_CANCEL){if(moveAxis==direction)moveAxis=0;return true;}return true;});return b;
@@ -519,8 +522,8 @@ public class MainActivity extends Activity {
             boolean preview3D=project.optString("dimension","2D").equals("3D");
             root.addView(label("CHẠY THỬ • Sự kiện đang được thực thi",12,Color.GREEN,true));
             root.addView(new SceneView(true,preview3D),new LinearLayout.LayoutParams(-1,dp(330)));
-            if(!preview3D){LinearLayout controls=row();controls.addView(holdButton("◀", -1));controls.addView(btn("NHẢY",()->{jumpRequested=true;}));controls.addView(btn("BẮN",()->executePhase("shoot",null)));controls.addView(holdButton("▶", 1));root.addView(controls);}
-            root.addView(label("Điểm: "+runtimeScore+"     Mạng: "+runtimeLives+"     Máu: "+(int)Math.round(runtimeObjectHealthValue(findPlayer())),16,fg,true));
+            if(!preview3D&&findPlayer()!=null){LinearLayout controls=row();controls.addView(holdButton("◀", -1));controls.addView(btn("NHẢY",()->{if(!runtimeGameOver)jumpRequested=true;}));controls.addView(btn("BẮN",()->{if(!runtimeGameOver)executePhase("shoot",null);}));controls.addView(holdButton("▶", 1));root.addView(controls);}
+            root.addView(label("Điểm: "+runtimeScore+"     Mạng: "+runtimeLives+(findPlayer()!=null?"     Máu: "+(int)Math.round(runtimeObjectHealthValue(findPlayer())):""),16,fg,true));
             if(runtimeGameOver)root.addView(label("GAME OVER — Nhấn Chơi lại để bắt đầu lại",18,Color.RED,true));
             root.addView(btn("Chơi lại",()->{stopRuntime();startRuntime();editor();}));
             root.addView(btn("Quay lại chỉnh sửa",()->{stopRuntime();preview=false;editor();}));
@@ -674,7 +677,7 @@ public class MainActivity extends Activity {
     class SceneView extends View{
         Paint p=new Paint(3);boolean run,three;float dx,dy;double sx,sy;boolean drag;
         SceneView(boolean r,boolean d){super(MainActivity.this);run=r;three=d;setBackgroundColor(bg);}
-        @Override protected void onDraw(Canvas c){super.onDraw(c);c.drawColor(Color.rgb(20,33,51));if(run)tickRuntime();float scale=Math.min(getWidth()/960f,getHeight()/540f);if(scale<=0)return;c.save();c.translate((getWidth()-960*scale)/2,(getHeight()-540*scale)/2);c.scale(scale,scale);if(three)draw3(c);else draw2(c);c.restore();p.setColor(muted);p.setTextSize(18);c.drawText(run?(three?"CHẠY THỬ 3D":"CHẠY THỬ 2D"):(three?"3D VIEW":"2D SCENE"),12,24,p);if(run){p.setColor(Color.WHITE);p.setTextSize(20);c.drawText("Score: "+runtimeScore+"   Lives: "+runtimeLives+"   HP: "+(int)Math.round(runtimeObjectHealthValue(findPlayer())),12,52,p);if(runtimeGameOver){p.setColor(Color.RED);p.setTextSize(38);c.drawText("GAME OVER",Math.max(12,getWidth()/2f-105),getHeight()/2f,p);}postInvalidateDelayed(40);}}
+        @Override protected void onDraw(Canvas c){super.onDraw(c);c.drawColor(Color.rgb(20,33,51));if(run)tickRuntime();float scale=Math.min(getWidth()/960f,getHeight()/540f);if(scale<=0)return;c.save();c.translate((getWidth()-960*scale)/2,(getHeight()-540*scale)/2);c.scale(scale,scale);if(three)draw3(c);else draw2(c);c.restore();p.setColor(muted);p.setTextSize(18);c.drawText(run?(three?"CHẠY THỬ 3D":"CHẠY THỬ 2D"):(three?"3D VIEW":"2D SCENE"),12,24,p);if(run){p.setColor(Color.WHITE);p.setTextSize(20);c.drawText("Score: "+runtimeScore+"   Lives: "+runtimeLives+(findPlayer()!=null?"   HP: "+(int)Math.round(runtimeObjectHealthValue(findPlayer())):""),12,52,p);if(runtimeGameOver){p.setColor(Color.RED);p.setTextSize(38);c.drawText("GAME OVER",Math.max(12,getWidth()/2f-105),getHeight()/2f,p);}postInvalidateDelayed(40);}}
         void draw2(Canvas c){p.setColor(Color.rgb(100,180,242));c.drawRect(0,0,960,540,p);p.setColor(Color.rgb(129,201,252));for(int x=0;x<=960;x+=40)c.drawLine(x,0,x,540,p);for(int y=0;y<=540;y+=40)c.drawLine(0,y,960,y,p);JSONArray a=run?runtimeSceneObjects():objects();for(int i=0;i<a.length();i++){JSONObject o=a.optJSONObject(i);if(o==null||(run&&(hiddenRuntimeObjects.contains(o.optString("name"))||destroyedRuntimeObjects.contains(o.optString("name")))))continue;float x=(float)(run?runtimeObjectCoordinate(o,true):o.optDouble("x")),y=(float)(run?runtimeObjectCoordinate(o,false):o.optDouble("y")),w=(float)o.optDouble("w"),h=(float)o.optDouble("h");String type=o.optString("type");p.setColor(o.optInt("color",Color.WHITE));Bitmap sprite=loadSprite(o.optString("image",""));if(sprite!=null)c.drawBitmap(sprite,null,new RectF(x,y,x+Math.max(1,w),y+Math.max(1,h)),p);else if(type.equals("coin")||type.equals("projectile"))c.drawCircle(x+w/2,y+h/2,Math.max(w,h)/2,p);else if(type.equals("platform")){c.drawRect(x,y,x+Math.max(40,w),y+Math.max(20,h),p);p.setColor(Color.rgb(117,73,45));c.drawRect(x,y+h*.6f,x+Math.max(40,w),y+Math.max(20,h),p);}else if(type.equals("camera")||type.equals("light")){p.setTextSize(25);c.drawText(type.equals("camera")?"CAM":"LGT",x+8,y+32,p);}else{c.drawRoundRect(x,y,x+Math.max(34,w),y+Math.max(34,h),8,8,p);p.setColor(Color.WHITE);p.setTextSize(13);c.drawText(o.optString("name"),x,y-4,p);}if(run&&(type.equals("enemy")||type.equals("player")))drawRuntimeHealthBar(c,o,x,y,Math.max(34,w));if(!run&&i==selected){p.setColor(Color.WHITE);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(3);c.drawRect(x-4,y-4,x+Math.max(34,w)+4,y+Math.max(34,h)+4,p);p.setStyle(Paint.Style.FILL);}}}
         void drawRuntimeHealthBar(Canvas c,JSONObject o,float x,float y,float w){double max=Math.max(1,o.optDouble("health",100)),hp=Math.max(0,Math.min(max,runtimeObjectHealthValue(o)));float top=y-9;p.setColor(Color.rgb(60,30,36));c.drawRect(x,top,x+w,top+5,p);p.setColor(hp/max>.35?Color.rgb(45,210,90):Color.rgb(245,75,70));c.drawRect(x,top,x+(float)(w*hp/max),top+5,p);}
      void draw3(Canvas c){p.setColor(Color.rgb(34,51,73));c.drawRect(0,0,960,540,p);p.setColor(Color.rgb(65,87,111));for(int i=-800;i<1600;i+=50){c.drawLine(480+i,0,480+i*.45f,540,p);c.drawLine(0,270+i*.24f,960,270+i*.24f,p);}JSONArray a=run?runtimeSceneObjects():objects();for(int i=0;i<a.length();i++){JSONObject o=a.optJSONObject(i);if(o==null||(run&&(hiddenRuntimeObjects.contains(o.optString("name"))||destroyedRuntimeObjects.contains(o.optString("name")))))continue;String type=o.optString("type");p.setColor(o.optInt("color",Color.BLUE));if(type.equals("camera")||type.equals("light")){p.setTextSize(22);c.drawText(type.equals("camera")?"◉ Camera":"☼ Light",35+i*20,55+i*24,p);continue;}float x=(float)(run?runtimeObjectCoordinate(o,true):o.optDouble("x")),y=(float)(run?runtimeObjectCoordinate(o,false):o.optDouble("y")),s=Math.max(30,(float)o.optDouble("w",60));x=480+(x-480)*.72f-(y-270)*.35f;y=280+(y-270)*.48f+(x-480)*.18f;Path path=new Path();path.moveTo(x,y-s);path.lineTo(x+s/2,y-s+s/3);path.lineTo(x,y-s+2*s/3);path.lineTo(x-s/2,y-s+s/3);path.close();p.setColor(o.optInt("color",Color.BLUE));c.drawPath(path,p);p.setColor(Color.rgb(35,74,138));c.drawRect(x-s/2,y-s+s/3,x,y+s/3,p);p.setColor(Color.rgb(27,57,111));c.drawRect(x,y-s+2*s/3,x+s/2,y+s/3,p);if(run&&(type.equals("enemy")||type.equals("player")))drawRuntimeHealthBar(c,o,x-s/2,y-s,s);}}
