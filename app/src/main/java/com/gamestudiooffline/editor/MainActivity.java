@@ -116,13 +116,15 @@ public class MainActivity extends Activity {
     final Map<String,Double> runtimeVars = new HashMap<>();
     final Map<String,Double> runtimeObjectX = new HashMap<>();
     final Map<String,Double> runtimeObjectY = new HashMap<>();
+    final Map<String,Double> runtimeObjectVX = new HashMap<>();
+    final Map<String,Double> runtimeObjectVY = new HashMap<>();
     final Map<String,Double> runtimeObjectHealth = new HashMap<>();
     final Set<String> hiddenRuntimeObjects = new HashSet<>();
     final Set<String> destroyedRuntimeObjects = new HashSet<>();
     final Set<String> previousContacts = new HashSet<>();
     final Map<Integer,Long> eventTimerLastFired = new HashMap<>();
     final Map<Integer,Boolean> eventConditionWasTrue = new HashMap<>();
-    double runtimePlayerX=120, runtimePlayerY=350, runtimePlayerVY=0;
+    double runtimePlayerX=120, runtimePlayerY=350, runtimePlayerVX=0, runtimePlayerVY=0;
     double runtimeSpawnX=120, runtimeSpawnY=350;
     double runtimeGravity=950, runtimeMoveSpeed=240, runtimeJumpStrength=430, runtimeTimeScale=1;
     float moveAxis=0;
@@ -134,16 +136,16 @@ public class MainActivity extends Activity {
         runtimeVars.clear();runtimeVars.put("Score",0d);runtimeVars.put("Lives",3d);runtimeVars.put("Timer",0d);
         JSONArray savedVars=project.optJSONArray("variables");
         if(savedVars!=null)for(int i=0;i<savedVars.length();i++){JSONObject v=savedVars.optJSONObject(i);if(v!=null){String n=v.optString("name","").trim();if(!n.isEmpty())putRuntimeVar(n,v.optDouble("value",0));}}
-        runtimeObjectX.clear();runtimeObjectY.clear();runtimeObjectHealth.clear();JSONArray sceneObjects=objects();for(int i=0;i<sceneObjects.length();i++){JSONObject o=sceneObjects.optJSONObject(i);if(o!=null){String n=o.optString("name","");runtimeObjectX.put(n,o.optDouble("x",0));runtimeObjectY.put(n,o.optDouble("y",0));runtimeObjectHealth.put(n,o.optDouble("health",100));}}
+        runtimeObjectX.clear();runtimeObjectY.clear();runtimeObjectVX.clear();runtimeObjectVY.clear();runtimeObjectHealth.clear();JSONArray sceneObjects=objects();for(int i=0;i<sceneObjects.length();i++){JSONObject o=sceneObjects.optJSONObject(i);if(o!=null){String n=o.optString("name","");runtimeObjectX.put(n,o.optDouble("x",0));runtimeObjectY.put(n,o.optDouble("y",0));runtimeObjectVX.put(n,o.optDouble("vx",0));runtimeObjectVY.put(n,o.optDouble("vy",0));runtimeObjectHealth.put(n,o.optDouble("health",100));}}
         hiddenRuntimeObjects.clear();destroyedRuntimeObjects.clear();previousContacts.clear();eventTimerLastFired.clear();eventConditionWasTrue.clear();
         runtimeScore=0;runtimeLives=3;runtimeGravity=950;runtimeMoveSpeed=240;runtimeJumpStrength=430;runtimeTimeScale=1;
-        runtimePlayerVY=0;moveAxis=0;jumpRequested=false;runtimeGrounded=false;
-        JSONObject player=findPlayer();if(player!=null){runtimePlayerX=player.optDouble("x",120);runtimePlayerY=player.optDouble("y",350);}
+        runtimePlayerVX=0;runtimePlayerVY=0;moveAxis=0;jumpRequested=false;runtimeGrounded=false;
+        JSONObject player=findPlayer();if(player!=null){runtimePlayerX=player.optDouble("x",120);runtimePlayerY=player.optDouble("y",350);runtimePlayerVX=player.optDouble("vx",0);}
         runtimeSpawnX=runtimePlayerX;runtimeSpawnY=runtimePlayerY;
         lastRuntimeTick=System.currentTimeMillis();runtimeStartMillis=lastRuntimeTick;runtimeStarted=true;
         executePhase("start",null);
     }
-    void stopRuntime(){runtimeStarted=false;moveAxis=0;jumpRequested=false;hiddenRuntimeObjects.clear();destroyedRuntimeObjects.clear();previousContacts.clear();runtimeObjectX.clear();runtimeObjectY.clear();runtimeObjectHealth.clear();}
+    void stopRuntime(){runtimeStarted=false;moveAxis=0;jumpRequested=false;hiddenRuntimeObjects.clear();destroyedRuntimeObjects.clear();previousContacts.clear();runtimeObjectX.clear();runtimeObjectY.clear();runtimeObjectVX.clear();runtimeObjectVY.clear();runtimeObjectHealth.clear();}
     JSONObject findObject(String query){
         if(query==null)return null;String q=query.trim();JSONArray a=objects();
         for(int i=0;i<a.length();i++){JSONObject o=a.optJSONObject(i);if(o!=null&&o.optString("name","").equalsIgnoreCase(q))return o;}
@@ -162,6 +164,8 @@ public class MainActivity extends Activity {
         (xAxis?runtimeObjectX:runtimeObjectY).put(o.optString("name",""),value);
     }
     void teleportObject(String query,double x,double y){JSONObject o=findObject(query);if(o==null)return;setObjectCoordinate(query,true,x);setObjectCoordinate(query,false,y);if(isPlayerObject(o))runtimePlayerVY=0;}
+    double runtimeObjectVelocity(JSONObject o,boolean xAxis){if(o==null)return 0;if(isPlayerObject(o))return xAxis?runtimePlayerVX:runtimePlayerVY;String n=o.optString("name","");return (xAxis?runtimeObjectVX:runtimeObjectVY).getOrDefault(n,o.optDouble(xAxis?"vx":"vy",0));}
+    void setObjectVelocity(String query,boolean xAxis,double value){JSONObject o=findObject(query);if(o==null)return;if(isPlayerObject(o)){if(xAxis)runtimePlayerVX=value;else runtimePlayerVY=value;return;}(xAxis?runtimeObjectVX:runtimeObjectVY).put(o.optString("name",""),value);}
     double runtimeObjectHealthValue(JSONObject o){if(o==null)return 0;return runtimeObjectHealth.getOrDefault(o.optString("name",""),o.optDouble("health",100));}
     void setObjectHealth(String query,double value){JSONObject o=findObject(query);if(o!=null)runtimeObjectHealth.put(o.optString("name",""),value);}
     JSONObject findPlayer(){
@@ -256,8 +260,8 @@ public class MainActivity extends Activity {
         try{return Double.parseDouble(s);}catch(Exception ignored){}
         if("Player.X".equalsIgnoreCase(s))return runtimePlayerX;
         if("Player.Y".equalsIgnoreCase(s))return runtimePlayerY;
-        Matcher objectCoordinate=Pattern.compile("^([A-Za-z_][A-Za-z0-9_]*)\\.(X|Y|Health)$",Pattern.CASE_INSENSITIVE).matcher(s);
-        if(objectCoordinate.matches()){JSONObject o=findObject(objectCoordinate.group(1));if(o!=null){String property=objectCoordinate.group(2);if(property.equalsIgnoreCase("Health"))return runtimeObjectHealthValue(o);return runtimeObjectCoordinate(o,property.equalsIgnoreCase("X"));}}
+        Matcher objectCoordinate=Pattern.compile("^([A-Za-z_][A-Za-z0-9_]*)\\.(X|Y|VX|VY|Health)$",Pattern.CASE_INSENSITIVE).matcher(s);
+        if(objectCoordinate.matches()){JSONObject o=findObject(objectCoordinate.group(1));if(o!=null){String property=objectCoordinate.group(2);if(property.equalsIgnoreCase("Health"))return runtimeObjectHealthValue(o);if(property.equalsIgnoreCase("VX"))return runtimeObjectVelocity(o,true);if(property.equalsIgnoreCase("VY"))return runtimeObjectVelocity(o,false);return runtimeObjectCoordinate(o,property.equalsIgnoreCase("X"));}}
         if("Player.VY".equalsIgnoreCase(s))return runtimePlayerVY;
         if("Timer".equalsIgnoreCase(s))return Math.max(0,(System.currentTimeMillis()-runtimeStartMillis)/1000d);
         for(Map.Entry<String,Double> entry:runtimeVars.entrySet())if(entry.getKey().equalsIgnoreCase(s))return entry.getValue();
@@ -312,8 +316,8 @@ public class MainActivity extends Activity {
         Matcher hide=Pattern.compile("(?i)^(hide|show|destroy)\\s+(.+)$").matcher(command);
         if(customSet.matches()){
             String key=customSet.group(1);Double calculated=resolveValue(customSet.group(2));if(calculated==null)return;double value=calculated;
-            Matcher objectCoordinate=Pattern.compile("(?i)^([A-Za-z_][A-Za-z0-9_]*)\\.(X|Y|Health)$").matcher(key);
-            if(objectCoordinate.matches()&&findObject(objectCoordinate.group(1))!=null){String property=objectCoordinate.group(2);if(property.equalsIgnoreCase("Health"))setObjectHealth(objectCoordinate.group(1),value);else setObjectCoordinate(objectCoordinate.group(1),property.equalsIgnoreCase("X"),value);}
+            Matcher objectCoordinate=Pattern.compile("(?i)^([A-Za-z_][A-Za-z0-9_]*)\\.(X|Y|VX|VY|Health)$").matcher(key);
+            if(objectCoordinate.matches()&&findObject(objectCoordinate.group(1))!=null){String property=objectCoordinate.group(2);String target=objectCoordinate.group(1);if(property.equalsIgnoreCase("Health"))setObjectHealth(target,value);else if(property.equalsIgnoreCase("VX"))setObjectVelocity(target,true,value);else if(property.equalsIgnoreCase("VY"))setObjectVelocity(target,false,value);else setObjectCoordinate(target,property.equalsIgnoreCase("X"),value);}
             else if(key.equalsIgnoreCase("Player.X"))runtimePlayerX=value;
             else if(key.equalsIgnoreCase("Player.Y"))runtimePlayerY=value;
             else if(key.equalsIgnoreCase("Player.VY"))runtimePlayerVY=value;
@@ -362,7 +366,7 @@ public class MainActivity extends Activity {
         double pw=Math.max(20,player.optDouble("w",48)),ph=Math.max(20,player.optDouble("h",60));
         double oldBottom=runtimePlayerY+ph;
         dt*=runtimeTimeScale;
-        runtimePlayerX=Math.max(0,Math.min(960-pw,runtimePlayerX+moveAxis*runtimeMoveSpeed*dt));
+        runtimePlayerX=Math.max(0,Math.min(960-pw,runtimePlayerX+(moveAxis*runtimeMoveSpeed+runtimePlayerVX)*dt));
         runtimePlayerVY=Math.min(1200,runtimePlayerVY+runtimeGravity*dt);
         runtimePlayerY=Math.max(0,runtimePlayerY+runtimePlayerVY*dt);
         runtimeGrounded=false;
@@ -371,6 +375,7 @@ public class MainActivity extends Activity {
             JSONObject o=all.optJSONObject(i);if(o==null||o==player)continue;
             String type=o.optString("type","").toLowerCase(Locale.ROOT),name=o.optString("name","Object");
             if(hiddenRuntimeObjects.contains(name)||destroyedRuntimeObjects.contains(name))continue;
+            runtimeObjectX.put(name,runtimeObjectCoordinate(o,true)+runtimeObjectVelocity(o,true)*dt);runtimeObjectY.put(name,runtimeObjectCoordinate(o,false)+runtimeObjectVelocity(o,false)*dt);
             double ox=runtimeObjectCoordinate(o,true),oy=runtimeObjectCoordinate(o,false),ow=Math.max(1,o.optDouble("w")),oh=Math.max(1,o.optDouble("h"));
             boolean overlap=runtimePlayerX<ox+ow&&runtimePlayerX+pw>ox&&runtimePlayerY<oy+oh&&runtimePlayerY+ph>oy;
             boolean landedOnThisPlatform=type.equals("platform")&&runtimePlayerVY>=0&&oldBottom<=oy+12&&runtimePlayerY+ph>=oy&&runtimePlayerX+pw>ox&&runtimePlayerX<ox+ow;
@@ -426,7 +431,7 @@ public class MainActivity extends Activity {
     void editObject(){
         JSONArray a=objects();if(a.length()==0)return;selected=Math.max(0,Math.min(selected,a.length()-1));JSONObject o=a.optJSONObject(selected);
         LinearLayout box=new LinearLayout(this);box.setPadding(dp(10),dp(6),dp(10),dp(6));box.setOrientation(1);
-        EditText n=field(o.optString("name"));EditText x=field(""+(int)o.optDouble("x"));EditText y=field(""+(int)o.optDouble("y"));EditText w=field(""+(int)o.optDouble("w"));EditText h=field(""+(int)o.optDouble("h"));EditText health=field(""+(int)o.optDouble("health",100));
+        EditText n=field(o.optString("name"));EditText x=field(""+(int)o.optDouble("x"));EditText y=field(""+(int)o.optDouble("y"));EditText w=field(""+(int)o.optDouble("w"));EditText h=field(""+(int)o.optDouble("h"));EditText health=field(""+(int)o.optDouble("health",100));EditText vx=field(""+o.optDouble("vx",0));EditText vy=field(""+o.optDouble("vy",0));
         String[] types={"player","enemy","cube","coin","platform"};
         String[] typeLabels={"Nhân vật (Player)","Kẻ địch (Enemy)","Khối 3D (Cube)","Vật phẩm (Coin)","Nền sàn (Platform)"};
         Spinner type=new Spinner(this);
@@ -440,8 +445,8 @@ public class MainActivity extends Activity {
         int oldColor=o.optInt("color",Color.BLUE), colorIndex=0;
         for(int i=0;i<colors.length;i++)if(colors[i]==oldColor){colorIndex=i;break;}
         color.setSelection(colorIndex);
-        for(Object[] pair:new Object[][]{{"Tên",n},{"Loại đối tượng",type},{"Màu",color},{"Vị trí X",x},{"Vị trí Y",y},{"Chiều rộng",w},{"Chiều cao",h},{"Máu ban đầu (Health)",health}}){box.addView(label((String)pair[0],12,muted,false));box.addView((View)pair[1]);}
-        new AlertDialog.Builder(this).setTitle("Thuộc tính đối tượng").setView(box).setNegativeButton("Hủy",null).setPositiveButton("Lưu",(d,z)->{try{o.put("name",n.getText().toString().trim().isEmpty()?currentType:n.getText().toString().trim());o.put("type",types[type.getSelectedItemPosition()]);o.put("color",colors[color.getSelectedItemPosition()]);o.put("x",num(x));o.put("y",num(y));o.put("w",Math.max(1,num(w)));o.put("h",Math.max(1,num(h)));o.put("health",Math.max(0,num(health)));spriteCache.clear();save();editor();}catch(Exception ex){toast("Không lưu được thuộc tính");}}).show();
+        for(Object[] pair:new Object[][]{{"Tên",n},{"Loại đối tượng",type},{"Màu",color},{"Vị trí X",x},{"Vị trí Y",y},{"Chiều rộng",w},{"Chiều cao",h},{"Máu ban đầu (Health)",health},{"Vận tốc X ban đầu",vx},{"Vận tốc Y ban đầu",vy}}){box.addView(label((String)pair[0],12,muted,false));box.addView((View)pair[1]);}
+        new AlertDialog.Builder(this).setTitle("Thuộc tính đối tượng").setView(box).setNegativeButton("Hủy",null).setPositiveButton("Lưu",(d,z)->{try{o.put("name",n.getText().toString().trim().isEmpty()?currentType:n.getText().toString().trim());o.put("type",types[type.getSelectedItemPosition()]);o.put("color",colors[color.getSelectedItemPosition()]);o.put("x",num(x));o.put("y",num(y));o.put("w",Math.max(1,num(w)));o.put("h",Math.max(1,num(h)));o.put("health",Math.max(0,num(health)));o.put("vx",num(vx));o.put("vy",num(vy));spriteCache.clear();save();editor();}catch(Exception ex){toast("Không lưu được thuộc tính");}}).show();
     }
     void duplicateSelected(){
         JSONArray a=objects();if(a.length()==0)return;
@@ -509,7 +514,7 @@ public class MainActivity extends Activity {
         }
         root.addView(btn("+ Thêm sự kiện",()->editEvent(-1)));
         root.addView(label("Điều kiện hỗ trợ: Score >= 10, Lives <= 0, Timer > 5, Player.X >= 300; kết hợp &&, ||, ! và dấu ngoặc. Chọn 'Khi điều kiện chuyển thành đúng' để chạy một lần khi điều kiện vừa đúng.",12,muted,false));
-        root.addView(label("Lệnh tùy chỉnh: set Score = 10; add Score 5; subtract Lives 1; set Player.X = 100; set Enemy.X = Player.X + 80; set Coin.Y = Coin.Y - 3; teleport Enemy 400 200; set Enemy.Health = Enemy.Health - 25; destroy Enemy. Máu của mỗi đối tượng mặc định 100; dùng điều kiện Enemy.Health <= 0 với hành động destroy Enemy để loại kẻ địch. Tên đối tượng trong lệnh phải viết liền, không dấu cách. Các lệnh khác: set Gravity = 800; set MoveSpeed = 300; set JumpStrength = 500; set TimeScale = 0.5; hide Coin; show Enemy; respawn Player.",12,muted,false));
+        root.addView(label("Lệnh tùy chỉnh: set Enemy.VX = 80; set Enemy.VY = 0; set Player.VX = 100; set Enemy.X = Player.X + 80; set Coin.Y = Coin.Y - 3; teleport Enemy 400 200; set Enemy.Health = Enemy.Health - 25; destroy Enemy. VX/VY là vận tốc X/Y và duy trì mỗi khung hình; mặc định 0. Máu mặc định 100. Tên đối tượng trong các lệnh phải viết liền, không dấu cách. Các lệnh khác: set Score = 10; add Score 5; subtract Lives 1; set Gravity = 800; set MoveSpeed = 300; set JumpStrength = 500; set TimeScale = 0.5; hide Coin; show Enemy; respawn Player.",12,muted,false));
     }
     void editEvent(int index){
         JSONArray existingEvents=project.optJSONArray("events");
