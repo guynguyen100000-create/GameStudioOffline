@@ -762,21 +762,49 @@ public class MainActivity extends Activity {
         }).show();
     }
 
+    String explainTrigger(String trigger){
+        String s=trigger==null?"":trigger.toLowerCase(Locale.ROOT);
+        if(s.contains("bắt đầu cảnh"))return "Chạy khi màn chơi vừa bắt đầu. Thường dùng để đặt điểm, mạng hoặc khởi tạo đối tượng.";
+        if(s.contains("chạm"))return "Chạy khi hai đối tượng được nêu trong sự kiện chạm nhau. Hãy kiểm tra đúng tên đối tượng.";
+        if(s.contains("bấm nút"))return "Chạy khi người chơi bấm nút tương ứng trong lúc chơi thử.";
+        if(s.startsWith("mỗi "))return "Lặp lại theo khoảng thời gian đã chọn khi chơi thử.";
+        if(s.contains("điều kiện chuyển thành đúng"))return "Chạy một lần khi điều kiện đổi từ sai sang đúng, tránh lặp liên tục khi điều kiện vẫn đúng.";
+        return "Đây là thời điểm kích hoạt các hành động trong khối. Chạm khối để chỉnh sửa.";
+    }
+    String explainCondition(String condition){
+        if(condition==null||condition.trim().isEmpty())return "Không có điều kiện bổ sung: hành động được xét mỗi khi sự kiện kích hoạt.";
+        return "Chỉ thực hiện hành động khi biểu thức này đúng. Ví dụ Score >= 10 nghĩa là điểm phải từ 10 trở lên; && nghĩa là cả hai điều kiện đều đúng, || nghĩa là ít nhất một điều kiện đúng.";
+    }
+    String explainAction(String action){
+        String s=action==null?"":action.toLowerCase(Locale.ROOT);
+        if(s.startsWith("đặt biến"))return "Gán một giá trị mới cho biến. Ví dụ đặt Score = 0 để đặt lại điểm.";
+        if(s.contains("tăng")&&s.contains("score"))return "Cộng thêm điểm vào biến Score. Hãy chọn số điểm muốn cộng trong hành động hoặc lệnh tùy chỉnh.";
+        if(s.contains("ẩn"))return "Ẩn đối tượng khỏi cảnh; cách ẩn có thể khác với xóa đối tượng khỏi dự án.";
+        if(s.contains("hủy")||s.contains("loại bỏ")||s.contains("destroy"))return "Loại bỏ đối tượng trong lúc chơi thử. Dùng khi đạn trúng mục tiêu hoặc vật phẩm đã được nhặt.";
+        if(s.contains("máu")||s.contains("mạng"))return "Thay đổi lượng máu hoặc số mạng của nhân vật. Kiểm tra điều kiện thua/thắng sau đó.";
+        if(s.contains("bắn"))return "Tạo hoặc phóng đạn theo hành động đã chọn. Cần có đối tượng Projectile trong cảnh.";
+        if(s.contains("lệnh tùy chỉnh"))return "Thực hiện câu lệnh dạng văn bản ở ô lệnh tùy chỉnh bên dưới.";
+        return "Đây là việc game sẽ làm khi khối được kích hoạt và điều kiện (nếu có) đúng.";
+    }
     void eventPanel(LinearLayout root){
         root.addView(label("Khối sự kiện No-code",18,fg,true));
-        root.addView(label("Chạm vào một khối để sửa điều kiện/hành động. Nhấn giữ để xóa.",12,muted,false));
+        root.addView(label("Các khối được xếp theo thứ tự từ trên xuống. Chạm khối để sửa; nhấn giữ để xóa. Mỗi khối có giải thích bên dưới.",12,muted,false));
         JSONArray a=project.optJSONArray("events");
         if(a!=null)for(int i=0;i<a.length();i++){
             int idx=i;JSONObject e=a.optJSONObject(i);
+            String trigger=e.optString("trigger","");
             String shownAction=e.optString("customAction","").trim();if(shownAction.isEmpty())shownAction=e.optString("action","");
             String cond=e.optString("condition","").trim();
-            TextView t=card("🟩 KHI "+e.optString("trigger")+(cond.isEmpty()?"":"\n🔎 NẾU "+cond)+"\n🟦 LÀM "+shownAction);
+            TextView t=card("🟨 KHI  "+trigger+"\n"+(cond.isEmpty()?"": "🔎 NẾU  "+cond+"\n")+"🟦 LÀM  "+shownAction+"\n\nⓘ Chạm để chỉnh sửa");
             root.addView(t);t.setOnClickListener(v->editEvent(idx));
-            t.setOnLongClickListener(v->{new AlertDialog.Builder(this).setMessage("Xóa khối này?").setNegativeButton("Hủy",null).setPositiveButton("Xóa",(d,w)->{project.optJSONArray("events").remove(idx);save();editor();}).show();return true;});
+            t.setOnLongClickListener(v->{new AlertDialog.Builder(this).setMessage("Xóa khối sự kiện này?").setNegativeButton("Hủy",null).setPositiveButton("Xóa",(d,w)->{project.optJSONArray("events").remove(idx);save();editor();}).show();return true;});
+            TextView explanation=card("💡 Giải thích\nKHI: "+explainTrigger(trigger)+"\nNẾU: "+explainCondition(cond)+"\nLÀM: "+explainAction(shownAction));
+            explanation.setTextSize(12);explanation.setTextColor(muted);
+            root.addView(explanation);
         }
         root.addView(btn("+ Thêm sự kiện",()->editEvent(-1)));
-        root.addView(label("Điều kiện hỗ trợ: Score >= 10, Lives <= 0, Timer > 5, Player.X >= 300; kết hợp &&, ||, ! và dấu ngoặc. Chọn 'Khi điều kiện chuyển thành đúng' để chạy một lần khi điều kiện vừa đúng.",12,muted,false));
-        root.addView(label("Lệnh tùy chỉnh: thêm mẫu Đạn (Projectile), rồi dùng spawn Projectile at Player 260 0 (tạo bản sao đạn tại Player, vận tốc X=260/Y=0); spawn Projectile 300 200 260 0; follow Enemy Player 100; stopFollow Enemy; set Enemy.VX = 80; set Enemy.VY = 0; set Player.VX = 100; set Enemy.X = Player.X + 80; teleport Enemy 400 200; set LastHitEnemy.Health = LastHitEnemy.Health - 25; destroy LastHitProjectile (nhắm đúng đạn vừa va chạm); destroy Enemy. Spawn chỉ tồn tại trong lúc chơi thử, không sửa dự án gốc. VX/VY là vận tốc X/Y theo giây. Tên mẫu dùng trong lệnh spawn nên viết liền, không dấu cách. Các lệnh khác: set Score = 10; add Score 5; subtract Lives 1; set Gravity = 800; set MoveSpeed = 300; set JumpStrength = 500; set TimeScale = 0.5; hide Coin; show Enemy; respawn Player.",12,muted,false));
+        root.addView(label("Mẹo đọc khối: KHI = lúc nào chạy; NẾU = điều kiện phải đúng; LÀM = việc cần thực hiện. Ví dụ Score >= 10 nghĩa là điểm từ 10 trở lên. && yêu cầu cả hai điều kiện đúng; || chỉ cần một điều kiện đúng.",12,muted,false));
+        root.addView(label("Lệnh tùy chỉnh: spawn Projectile at Player 260 0; follow Enemy Player 100; set Enemy.VX = 80; teleport Enemy 400 200; add Score 5; subtract Lives 1; hide Coin; show Enemy; respawn Player. Các lệnh nâng cao được thực thi trong lúc chơi thử; hãy thử từng lệnh để kiểm tra kết quả.",12,muted,false));
     }
     void editEvent(int index){
         JSONArray existingEvents=project.optJSONArray("events");
