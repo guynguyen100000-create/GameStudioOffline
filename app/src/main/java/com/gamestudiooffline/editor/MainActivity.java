@@ -22,6 +22,8 @@ public class MainActivity extends Activity {
     static final int EXPORT_ZIP=7, IMPORT_PROJECT=8, IMPORT_IMAGE=9;
     final Map<String,Bitmap> spriteCache=new HashMap<>();
 
+    boolean finiteNumber(double value){return !Double.isNaN(value)&&!Double.isInfinite(value);}
+
     int dp(float n){return (int)(n*getResources().getDisplayMetrics().density+.5f);}
     @Override public void onCreate(Bundle b){super.onCreate(b);getWindow().setStatusBarColor(bg);getWindow().setNavigationBarColor(bg);home();}
     File dir(){File f=new File(getFilesDir(),"projects");f.mkdirs();return f;}
@@ -51,6 +53,52 @@ public class MainActivity extends Activity {
         o.put("image",name);spriteCache.remove(name);save();editor();toast("Đã gán ảnh cho "+o.optString("name"));
     }
     byte[] readAll(InputStream in)throws IOException{ByteArrayOutputStream b=new ByteArrayOutputStream();byte[] buf=new byte[8192];int n;while((n=in.read(buf))>0)b.write(buf,0,n);return b.toByteArray();}
+    void validateImportedProject(JSONObject loaded)throws IOException{
+        if(loaded==null)throw new IOException("Tệp dự án trống");
+        String name=loaded.optString("name","").trim();
+        if(name.isEmpty())throw new IOException("Dự án thiếu tên");
+        String dimension=loaded.optString("dimension","2D").trim();
+        if(!dimension.equalsIgnoreCase("2D")&&!dimension.equalsIgnoreCase("3D"))
+            throw new IOException("Loại cảnh không hợp lệ (chỉ nhận 2D hoặc 3D)");
+        int width=loaded.optInt("width",960),height=loaded.optInt("height",540);
+        if(width<1||height<1||width>100000||height>100000)
+            throw new IOException("Kích thước cảnh không hợp lệ");
+        JSONArray objects=loaded.optJSONArray("objects");
+        if(objects==null)throw new IOException("Dự án thiếu danh sách đối tượng");
+        if(objects.length()>5000)throw new IOException("Dự án có quá nhiều đối tượng (tối đa 5000)");
+        for(int i=0;i<objects.length();i++){
+            JSONObject o=objects.optJSONObject(i);
+            if(o==null)throw new IOException("Đối tượng thứ "+(i+1)+" không hợp lệ");
+            if(o.optString("name","").trim().isEmpty())
+                throw new IOException("Đối tượng thứ "+(i+1)+" thiếu tên");
+            double x=o.optDouble("x",Double.NaN),y=o.optDouble("y",Double.NaN);
+            double w=o.optDouble("w",Double.NaN),h=o.optDouble("h",Double.NaN);
+            double health=o.optDouble("health",100),vx=o.optDouble("vx",0),vy=o.optDouble("vy",0);
+            if(!finiteNumber(x)||!finiteNumber(y)||!finiteNumber(w)||!finiteNumber(h)||
+               !finiteNumber(health)||!finiteNumber(vx)||!finiteNumber(vy)||w<0||h<0||health<0)
+                throw new IOException("Dữ liệu số của đối tượng "+o.optString("name")+" không hợp lệ");
+        }
+        JSONArray variables=loaded.optJSONArray("variables");
+        if(variables!=null){
+            if(variables.length()>1000)throw new IOException("Dự án có quá nhiều biến (tối đa 1000)");
+            for(int i=0;i<variables.length();i++){
+                JSONObject v=variables.optJSONObject(i);
+                if(v==null||!v.optString("name","").matches("[A-Za-z_][A-Za-z0-9_]*")||
+                   !finiteNumber(v.optDouble("value",Double.NaN)))
+                    throw new IOException("Biến thứ "+(i+1)+" không hợp lệ");
+            }
+        }
+        JSONArray events=loaded.optJSONArray("events");
+        if(events!=null){
+            if(events.length()>10000)throw new IOException("Dự án có quá nhiều khối sự kiện (tối đa 10000)");
+            for(int i=0;i<events.length();i++){
+                JSONObject e=events.optJSONObject(i);
+                if(e==null||e.optString("trigger","").trim().isEmpty())
+                    throw new IOException("Khối sự kiện thứ "+(i+1)+" không hợp lệ");
+            }
+        }
+    }
+
     void importProjectBytes(byte[] bytes)throws Exception{
         if(bytes.length>=2&&bytes[0]=='P'&&bytes[1]=='K'){
             JSONObject loaded=null;Map<String,byte[]> importedAssets=new HashMap<>();
@@ -62,8 +110,13 @@ public class MainActivity extends Activity {
                 }
             }
             if(loaded==null)throw new IOException("ZIP không có project.gsproj");
+            validateImportedProject(loaded);
             project=loaded;File ad=assetDir();for(Map.Entry<String,byte[]> entry:importedAssets.entrySet()){try(FileOutputStream out=new FileOutputStream(new File(ad,entry.getKey()))){out.write(entry.getValue());}}
-        }else project=new JSONObject(new String(bytes,StandardCharsets.UTF_8));
+        }else{
+            JSONObject loaded=new JSONObject(new String(bytes,StandardCharsets.UTF_8));
+            validateImportedProject(loaded);
+            project=loaded;
+        }
         activeFile=new File(dir(),safe(project.optString("name","Imported"))+".gsproj");
         save();spriteCache.clear();tab=project.optString("dimension","2D");preview=false;selected=0;editor();toast("Đã nhập dự án và tài nguyên (nếu có)");
     }
@@ -337,7 +390,7 @@ public class MainActivity extends Activity {
         if(token==null)return null;
         String s=token.trim();
         Double simple=resolveSimpleValue(s);if(simple!=null)return simple;
-        try{ExpressionParser parser=new ExpressionParser(s);double value=parser.expression();parser.spaces();if(parser.pos==s.length()&&Double.isFinite(value))return value;}catch(Exception ignored){}
+        try{ExpressionParser parser=new ExpressionParser(s);double value=parser.expression();parser.spaces();if(parser.pos==s.length()&&finiteNumber(value))return value;}catch(Exception ignored){}
         return null;
     }
     Double resolveSimpleValue(String token){
@@ -542,10 +595,10 @@ public class MainActivity extends Activity {
             String objectLabel=name.isEmpty()?"đối tượng "+(i+1):name;
             double x=o.optDouble("x",Double.NaN),y=o.optDouble("y",Double.NaN),w=o.optDouble("w",Double.NaN),h=o.optDouble("h",Double.NaN);
             double health=o.optDouble("health",100),vx=o.optDouble("vx",0),vy=o.optDouble("vy",0);
-            if(!Double.isFinite(x)||!Double.isFinite(y)||!Double.isFinite(w)||!Double.isFinite(h))errors.add("• Tọa độ/kích thước của "+objectLabel+" phải là số hữu hạn.");
+            if(!finiteNumber(x)||!finiteNumber(y)||!finiteNumber(w)||!finiteNumber(h))errors.add("• Tọa độ/kích thước của "+objectLabel+" phải là số hữu hạn.");
             if(w<0||h<0)errors.add("• Kích thước của "+objectLabel+" không được âm.");
-            if(!Double.isFinite(health)||health<0)errors.add("• Máu ban đầu của "+objectLabel+" phải là số không âm.");
-            if(!Double.isFinite(vx)||!Double.isFinite(vy))errors.add("• Vận tốc ban đầu của "+objectLabel+" phải là số hữu hạn.");
+            if(!finiteNumber(health)||health<0)errors.add("• Máu ban đầu của "+objectLabel+" phải là số không âm.");
+            if(!finiteNumber(vx)||!finiteNumber(vy))errors.add("• Vận tốc ban đầu của "+objectLabel+" phải là số hữu hạn.");
         }
         if(!hasPlayer)warnings.add("• Chưa có Player; các sự kiện điều khiển nhân vật sẽ không hoạt động.");
         JSONArray vars=project.optJSONArray("variables");HashSet<String> varNames=new HashSet<>();
@@ -555,7 +608,7 @@ public class MainActivity extends Activity {
             double value=v.optDouble("value",Double.NaN);
             if(!name.matches("[A-Za-z_][A-Za-z0-9_]*"))errors.add("• Tên biến không hợp lệ: "+(name.isEmpty()?"(trống)":name)+".");
             else if(!varNames.add(name.toLowerCase(Locale.ROOT)))errors.add("• Tên biến bị trùng: "+name+".");
-            if(!Double.isFinite(value))errors.add("• Giá trị ban đầu của biến "+(name.isEmpty()?"(không tên)":name)+" phải là số hữu hạn.");
+            if(!finiteNumber(value))errors.add("• Giá trị ban đầu của biến "+(name.isEmpty()?"(không tên)":name)+" phải là số hữu hạn.");
         }
         JSONArray events=project.optJSONArray("events");
         if(events!=null)for(int i=0;i<events.length();i++){
