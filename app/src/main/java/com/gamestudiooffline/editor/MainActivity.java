@@ -348,7 +348,7 @@ public class MainActivity extends Activity {
         if(customSet.matches()){
             String key=customSet.group(1);Double calculated=resolveValue(customSet.group(2));if(calculated==null)return;double value=calculated;
             Matcher objectCoordinate=Pattern.compile("(?i)^([A-Za-z_][A-Za-z0-9_]*)\\.(X|Y|VX|VY|Health)$").matcher(key);
-            if(objectCoordinate.matches()&&findObject(objectCoordinate.group(1))!=null){String property=objectCoordinate.group(2);String target=resolveLastHitTarget(objectCoordinate.group(1));if(property.equalsIgnoreCase("Health"))setObjectHealth(target,value);else if(property.equalsIgnoreCase("VX"))setObjectVelocity(target,true,value);else if(property.equalsIgnoreCase("VY"))setObjectVelocity(target,false,value);else setObjectCoordinate(target,property.equalsIgnoreCase("X"),value);}
+            if(objectCoordinate.matches()&&findObject(resolveLastHitTarget(objectCoordinate.group(1)))!=null){String property=objectCoordinate.group(2);String target=resolveLastHitTarget(objectCoordinate.group(1));if(property.equalsIgnoreCase("Health"))setObjectHealth(target,value);else if(property.equalsIgnoreCase("VX"))setObjectVelocity(target,true,value);else if(property.equalsIgnoreCase("VY"))setObjectVelocity(target,false,value);else setObjectCoordinate(target,property.equalsIgnoreCase("X"),value);}
             else if(key.equalsIgnoreCase("Player.X"))runtimePlayerX=value;
             else if(key.equalsIgnoreCase("Player.Y"))runtimePlayerY=value;
             else if(key.equalsIgnoreCase("Player.VY"))runtimePlayerVY=value;
