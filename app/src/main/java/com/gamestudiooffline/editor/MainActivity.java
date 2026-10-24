@@ -192,7 +192,7 @@ public class MainActivity extends Activity {
     double runtimeObjectVelocity(JSONObject o,boolean xAxis){if(o==null)return 0;if(isPlayerObject(o))return xAxis?runtimePlayerVX:runtimePlayerVY;String n=o.optString("name","");return (xAxis?runtimeObjectVX:runtimeObjectVY).getOrDefault(n,o.optDouble(xAxis?"vx":"vy",0));}
     void setObjectVelocity(String query,boolean xAxis,double value){JSONObject o=findObject(query);if(o==null)return;if(isPlayerObject(o)){if(xAxis)runtimePlayerVX=value;else runtimePlayerVY=value;return;}(xAxis?runtimeObjectVX:runtimeObjectVY).put(o.optString("name",""),value);}
     double runtimeObjectHealthValue(JSONObject o){if(o==null)return 0;return runtimeObjectHealth.getOrDefault(o.optString("name",""),o.optDouble("health",100));}
-    void setObjectHealth(String query,double value){JSONObject o=findObject(query);if(o!=null)runtimeObjectHealth.put(o.optString("name",""),value);}
+    void setObjectHealth(String query,double value){JSONObject o=findObject(query);if(o!=null){double max=Math.max(0,o.optDouble("health",100));runtimeObjectHealth.put(o.optString("name",""),Math.max(0,Math.min(max,value)));}}
     JSONObject findPlayer(){
         JSONArray a=objects();for(int i=0;i<a.length();i++){JSONObject o=a.optJSONObject(i);if(o!=null&&(o.optString("type").equalsIgnoreCase("player")||o.optString("name").equalsIgnoreCase("player")))return o;}return null;
     }
