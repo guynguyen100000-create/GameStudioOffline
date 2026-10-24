@@ -401,6 +401,10 @@ public class MainActivity extends Activity {
         Matcher objectCoordinate=Pattern.compile("^([A-Za-z_][A-Za-z0-9_]*)\\.(X|Y|VX|VY|Health)$",Pattern.CASE_INSENSITIVE).matcher(s);
         if(objectCoordinate.matches()){JSONObject o=findObject(resolveLastHitTarget(objectCoordinate.group(1)));if(o!=null){String property=objectCoordinate.group(2);if(property.equalsIgnoreCase("Health"))return runtimeObjectHealthValue(o);if(property.equalsIgnoreCase("VX"))return runtimeObjectVelocity(o,true);if(property.equalsIgnoreCase("VY"))return runtimeObjectVelocity(o,false);return runtimeObjectCoordinate(o,property.equalsIgnoreCase("X"));}}
         if("Player.VY".equalsIgnoreCase(s))return runtimePlayerVY;
+        if("Gravity".equalsIgnoreCase(s))return runtimeGravity;
+        if("MoveSpeed".equalsIgnoreCase(s))return runtimeMoveSpeed;
+        if("JumpStrength".equalsIgnoreCase(s))return runtimeJumpStrength;
+        if("TimeScale".equalsIgnoreCase(s))return runtimeTimeScale;
         if("Timer".equalsIgnoreCase(s))return Math.max(0,(System.currentTimeMillis()-runtimeStartMillis)/1000d);
         for(Map.Entry<String,Double> entry:runtimeVars.entrySet())if(entry.getKey().equalsIgnoreCase(s))return entry.getValue();
         return null;
@@ -485,8 +489,17 @@ public class MainActivity extends Activity {
             setRuntimeValue(key,calculated);updateHudValues();return;
         }
         if(customAdd.matches()||customSub.matches()){
-            Matcher m=customAdd.matches()?customAdd:customSub;String key=m.group(1);Double operand=resolveValue(m.group(2));if(operand==null)return;double value=operand;
-            putRuntimeVar(key,resolveValue(key)==null?0:resolveValue(key)+(m==customAdd?value:-value));updateHudValues();return;
+            Matcher m=customAdd.matches()?customAdd:customSub;
+            String key=m.group(1);
+            Double operand=resolveValue(m.group(2));
+            if(operand==null)return;
+            Double current=resolveValue(key);
+            double base=current==null?0:current;
+            double result=base+(m==customAdd?operand:-operand);
+            if(!finiteNumber(result))return;
+            setRuntimeValue(key,result);
+            updateHudValues();
+            return;
         }
         if(teleport.matches()){teleportObject(teleport.group(1),Double.parseDouble(teleport.group(2)),Double.parseDouble(teleport.group(3)));updateHudValues();return;}
         if(spawnAtPlayer.matches()){double vx=spawnAtPlayer.group(2)==null?Double.NaN:Double.parseDouble(spawnAtPlayer.group(2));double vy=spawnAtPlayer.group(3)==null?Double.NaN:Double.parseDouble(spawnAtPlayer.group(3));JSONObject p=findPlayer(),t=findObject(spawnAtPlayer.group(1));double spawnX=runtimePlayerX,spawnY=runtimePlayerY;if(p!=null&&t!=null){double pw=Math.max(1,p.optDouble("w",48)),ph=Math.max(1,p.optDouble("h",60)),tw=Math.max(1,t.optDouble("w",20)),th=Math.max(1,t.optDouble("h",20));spawnX=runtimePlayerX+(vx<0?-tw:pw);spawnY=runtimePlayerY+(ph-th)/2;}spawnRuntimeObject(spawnAtPlayer.group(1),spawnX,spawnY,vx,vy);updateHudValues();return;}
