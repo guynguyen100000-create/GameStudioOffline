@@ -86,6 +86,7 @@ public class MainActivity extends Activity {
         root.addView(label("Dự án mới",18,fg,true));
         nameBox=new EditText(this);nameBox.setSingleLine(true);nameBox.setHint("Tên dự án");nameBox.setHintTextColor(muted);nameBox.setTextColor(fg);nameBox.setBackgroundColor(panel);root.addView(nameBox,new LinearLayout.LayoutParams(-1,dp(48)));
         LinearLayout creation=row();creation.addView(btn("Tạo game 2D",()->create("2D")));creation.addView(btn("Tạo game 3D",()->create("3D")));root.addView(creation);
+        root.addView(btn("Tạo mẫu game (Đi cảnh / Bắn súng / RPG)",this::showTemplatePicker));
         root.addView(label("Dự án đã lưu trên máy",18,fg,true));
         File[] fs=dir().listFiles((f,n)->n.endsWith(".gsproj"));
         if(fs==null||fs.length==0)root.addView(card("Chưa có dự án. Tạo một dự án mới phía trên."));
@@ -108,6 +109,58 @@ public class MainActivity extends Activity {
             ev.put(event(dimension.equals("2D")?"Khi Player chạm Coin":"Khi bắt đầu cảnh",dimension.equals("2D")?"Tăng Score thêm 1 và ẩn Coin":"Đặt Camera nhìn vào Cube"));project.put("events",ev);
             activeFile=new File(dir(),safe(n)+".gsproj");tab=dimension;save();selected=0;editor();
         }catch(Exception e){toast("Lỗi tạo dự án: "+e.getMessage());}
+    }
+
+    JSONObject sceneObject(String n,String type,double x,double y,double w,double h,int color,double health,double vx,double vy)throws Exception{
+        JSONObject o=obj(n,type,x,y,w,h,color);o.put("health",health);o.put("vx",vx);o.put("vy",vy);return o;
+    }
+    JSONObject templateEvent(String trigger,String action,String customAction,String condition)throws Exception{
+        JSONObject e=event(trigger,action);e.put("customAction",customAction==null?"":customAction);e.put("condition",condition==null?"":condition);return e;
+    }
+    void showTemplatePicker(){
+        new AlertDialog.Builder(this).setTitle("Chọn mẫu game 2D").setItems(new String[]{"Đi cảnh cơ bản","Bắn súng 2D","RPG sinh tồn cơ bản"},(d,which)->{
+            if(which==0)create("2D");else if(which==1)createTemplate("shooter");else createTemplate("rpg");
+        }).setNegativeButton("Hủy",null).show();
+    }
+    void createTemplate(String kind){
+        String n=nameBox.getText().toString().trim();boolean shooter="shooter".equals(kind);
+        if(n.isEmpty())n=shooter?"ShooterStarter":"RPGStarter";
+        try{
+            project=new JSONObject();project.put("schema",1);project.put("name",n);project.put("dimension","2D");project.put("width",960);project.put("height",540);
+            JSONArray os=new JSONArray();
+            os.put(sceneObject("Player","player",75,350,48,60,Color.rgb(40,132,255),100,0,0));
+            os.put(sceneObject("Ground","platform",0,465,960,75,Color.rgb(56,174,99),100,0,0));
+            os.put(sceneObject("Enemy","enemy",shooter?610:570,380,48,55,Color.RED,100,0,0));
+            os.put(sceneObject("Enemy2","enemy",shooter?790:750,350,48,55,Color.rgb(220,75,80),100,0,0));
+            os.put(sceneObject("Coin","coin",320,405,30,30,Color.YELLOW,1,0,0));
+            os.put(sceneObject("Projectile","projectile",-120,-120,18,12,Color.YELLOW,1,0,0));
+            project.put("objects",os);
+            JSONArray vars=new JSONArray();vars.put(variable("Score",0));vars.put(variable("Lives",3));vars.put(variable("Timer",0));
+            if(!shooter){vars.put(variable("Gold",0));vars.put(variable("Level",1));}
+            project.put("variables",vars);
+            JSONArray ev=new JSONArray();
+            ev.put(event("Khi bắt đầu cảnh","Đặt biến Score = 0"));
+            if(shooter){
+                ev.put(event("Khi bấm nút Bắn","Bắn Projectile"));
+                ev.put(event("Khi Projectile chạm Enemy","Trừ 25 máu Enemy vừa trúng"));
+                ev.put(event("Khi Projectile chạm Enemy","Hủy Projectile vừa trúng"));
+                ev.put(templateEvent("Khi điều kiện chuyển thành đúng","Loại bỏ Enemy vừa trúng","", "LastHitEnemy.Health <= 0"));
+                ev.put(templateEvent("Khi điều kiện chuyển thành đúng","Tăng Score thêm 10","", "LastHitEnemy.Health <= 0"));
+                ev.put(event("Khi Player chạm Enemy","Trừ 10 máu Player"));
+                ev.put(event("Khi Player chạm Coin","Tăng Score thêm 1"));
+            }else{
+                ev.put(templateEvent("Khi bắt đầu cảnh","Lệnh tùy chỉnh (xem ô bên dưới)","follow Enemy Player 35",""));
+                ev.put(templateEvent("Khi bắt đầu cảnh","Lệnh tùy chỉnh (xem ô bên dưới)","follow Enemy2 Player 45",""));
+                ev.put(event("Khi Player chạm Coin","Tăng Score thêm 1"));
+                ev.put(templateEvent("Khi Player chạm Coin","Lệnh tùy chỉnh (xem ô bên dưới)","add Gold 5",""));
+                ev.put(event("Khi Player chạm Enemy","Trừ 10 máu Player"));
+                ev.put(templateEvent("Mỗi 5 giây","Lệnh tùy chỉnh (xem ô bên dưới)","set Player.Health = Player.Health + 5",""));
+                ev.put(templateEvent("Khi điều kiện chuyển thành đúng","Lệnh tùy chỉnh (xem ô bên dưới)","add Level 1","Score >= 10"));
+            }
+            project.put("events",ev);
+            activeFile=new File(dir(),safe(n)+".gsproj");tab="2D";preview=false;selected=0;save();editor();
+            toast(shooter?"Đã tạo mẫu Bắn súng 2D":"Đã tạo mẫu RPG sinh tồn");
+        }catch(Exception e){toast("Không tạo được mẫu game: "+e.getMessage());}
     }
     int selected=0;
     final String[] triggerChoices={"Khi bắt đầu cảnh","Mỗi khung hình","Mỗi 1 giây","Mỗi 5 giây","Mỗi 10 giây","Khi Player chạm Coin","Khi Player chạm Enemy","Khi Player chạm Cube","Khi Player chạm Platform","Khi Player chạm bất kỳ đối tượng nào","Khi Projectile chạm Enemy","Khi Enemy chạm Coin","Khi hai đối tượng chạm nhau","Khi bấm nút Nhảy","Khi bấm nút Bắn","Khi điều kiện chuyển thành đúng","Trong khi điều kiện đúng","Khi Player rơi khỏi màn hình"};
