@@ -110,7 +110,7 @@ public class MainActivity extends Activity {
         }catch(Exception e){toast("Lỗi tạo dự án: "+e.getMessage());}
     }
     int selected=0;
-    final String[] triggerChoices={"Khi bắt đầu cảnh","Mỗi khung hình","Mỗi 1 giây","Mỗi 5 giây","Mỗi 10 giây","Khi Player chạm Coin","Khi Player chạm Enemy","Khi Player chạm Cube","Khi Player chạm Platform","Khi Player chạm bất kỳ đối tượng nào","Khi bấm nút Nhảy","Khi điều kiện chuyển thành đúng","Trong khi điều kiện đúng","Khi Player rơi khỏi màn hình"};
+    final String[] triggerChoices={"Khi bắt đầu cảnh","Mỗi khung hình","Mỗi 1 giây","Mỗi 5 giây","Mỗi 10 giây","Khi Player chạm Coin","Khi Player chạm Enemy","Khi Player chạm Cube","Khi Player chạm Platform","Khi Player chạm bất kỳ đối tượng nào","Khi bấm nút Nhảy","Khi bấm nút Bắn","Khi điều kiện chuyển thành đúng","Trong khi điều kiện đúng","Khi Player rơi khỏi màn hình"};
     final String[] actionChoices={"Đặt biến Score = 0","Tăng Score thêm 1","Tăng Score thêm 10","Giảm Score đi 1","Đặt biến Lives = 3","Tăng Lives thêm 1","Ẩn Coin","Hiện Coin","Ẩn Enemy","Hiện Enemy","Cho Player nhảy","Trừ 1 mạng","Di chuyển Player","Di chuyển Player sang trái","Di chuyển Player sang phải","Hồi sinh Player","Đặt Gravity = 950","Đặt MoveSpeed = 240","Đặt JumpStrength = 430","Cho Enemy tự đi sang phải","Cho Enemy tự đi sang trái","Dừng Enemy","Trừ 25 máu Enemy","Hồi 25 máu Player","Đưa Player về điểm xuất phát","Lệnh tùy chỉnh (xem ô bên dưới)"};
     // Runtime state is separate from editor data; play-testing never changes saved object positions.
     final Map<String,Double> runtimeVars = new HashMap<>();
@@ -225,6 +225,7 @@ public class MainActivity extends Activity {
                 }
             }
             else if("jump".equals(phase))match=trigger.contains("bấm nút nhảy")||trigger.contains("nút nhảy");
+            else if("shoot".equals(phase))match=trigger.contains("bấm nút bắn")||trigger.contains("nút bắn");
             else if("collision".equals(phase))match=trigger.contains("chạm")&&contactType!=null&&(trigger.contains(contactType.toLowerCase(Locale.ROOT))||trigger.contains("bất kỳ đối tượng nào"));
             if(match&&!condition.isEmpty()&&!trigger.contains("điều kiện chuyển thành đúng")&&!trigger.contains("trong khi điều kiện đúng"))match=evaluateCondition(condition);
             if(match){
@@ -444,7 +445,7 @@ public class MainActivity extends Activity {
             boolean preview3D=project.optString("dimension","2D").equals("3D");
             root.addView(label("CHẠY THỬ • Sự kiện đang được thực thi",12,Color.GREEN,true));
             root.addView(new SceneView(true,preview3D),new LinearLayout.LayoutParams(-1,dp(330)));
-            if(!preview3D){LinearLayout controls=row();controls.addView(holdButton("◀", -1));controls.addView(btn("NHẢY",()->{jumpRequested=true;}));controls.addView(holdButton("▶", 1));root.addView(controls);}
+            if(!preview3D){LinearLayout controls=row();controls.addView(holdButton("◀", -1));controls.addView(btn("NHẢY",()->{jumpRequested=true;}));controls.addView(btn("BẮN",()->executePhase("shoot",null)));controls.addView(holdButton("▶", 1));root.addView(controls);}
             root.addView(label("Điểm: "+runtimeScore+"     Mạng: "+runtimeLives+"     Máu: "+(int)Math.round(runtimeObjectHealthValue(findPlayer())),16,fg,true));
             root.addView(btn("Quay lại chỉnh sửa",()->{stopRuntime();preview=false;editor();}));
         }
