@@ -149,6 +149,14 @@ public class MainActivity extends Activity {
     }
     void stopRuntime(){runtimeStarted=false;moveAxis=0;jumpRequested=false;hiddenRuntimeObjects.clear();destroyedRuntimeObjects.clear();previousContacts.clear();runtimeSpawnedObjects.clear();runtimeSpawnCounter=0;runtimeObjectX.clear();runtimeObjectY.clear();runtimeObjectVX.clear();runtimeObjectVY.clear();runtimeObjectHealth.clear();}
     JSONArray runtimeSceneObjects(){JSONArray all=new JSONArray();JSONArray base=objects();for(int i=0;i<base.length();i++){JSONObject o=base.optJSONObject(i);if(o!=null)all.put(o);}for(JSONObject o:runtimeSpawnedObjects)if(o!=null)all.put(o);return all;}
+    boolean runtimeTargetMatches(JSONObject o,String query,JSONArray all){
+        String q=query.trim().toLowerCase(Locale.ROOT),name=o.optString("name","").toLowerCase(Locale.ROOT),type=o.optString("type","").toLowerCase(Locale.ROOT);boolean exactNameExists=false;
+        for(int i=0;i<all.length();i++){JSONObject item=all.optJSONObject(i);if(item!=null&&item.optString("name","").equalsIgnoreCase(query.trim())){exactNameExists=true;break;}}
+        return exactNameExists?name.equals(q):(type.equals(q)||name.contains(q));
+    }
+    void cleanupRuntimeSpawns(){
+        java.util.Iterator<JSONObject> it=runtimeSpawnedObjects.iterator();while(it.hasNext()){JSONObject o=it.next();String n=o.optString("name","");double x=runtimeObjectCoordinate(o,true),y=runtimeObjectCoordinate(o,false);if(x < -160||x > 1120||y < -160||y > 700){it.remove();runtimeObjectX.remove(n);runtimeObjectY.remove(n);runtimeObjectVX.remove(n);runtimeObjectVY.remove(n);runtimeObjectHealth.remove(n);hiddenRuntimeObjects.remove(n);destroyedRuntimeObjects.remove(n);previousContacts.remove(o.optString("type","")+":"+n);}}
+    }
     JSONObject findObject(String query){
         if(query==null)return null;String q=query.trim();JSONArray a=objects();
         for(int i=0;i<a.length();i++){JSONObject o=a.optJSONObject(i);if(o!=null&&o.optString("name","").equalsIgnoreCase(q))return o;}
@@ -311,13 +319,13 @@ public class MainActivity extends Activity {
     void hideMatchingObjects(String query,boolean hidden){
         String q=query.trim().toLowerCase(Locale.ROOT);JSONArray a=runtimeSceneObjects();
         for(int i=0;i<a.length();i++){JSONObject o=a.optJSONObject(i);if(o==null)continue;String name=o.optString("name","").toLowerCase(Locale.ROOT),type=o.optString("type","").toLowerCase(Locale.ROOT);
-            if(name.equals(q)||type.equals(q)||name.contains(q)){if(hidden)hiddenRuntimeObjects.add(o.optString("name",""));else hiddenRuntimeObjects.remove(o.optString("name",""));}
+            if(runtimeTargetMatches(o,query,a)){if(hidden)hiddenRuntimeObjects.add(o.optString("name",""));else hiddenRuntimeObjects.remove(o.optString("name",""));}
         }
     }
     void destroyMatchingObjects(String query){
         String q=query.trim().toLowerCase(Locale.ROOT);JSONArray a=runtimeSceneObjects();
         for(int i=0;i<a.length();i++){JSONObject o=a.optJSONObject(i);if(o==null)continue;String name=o.optString("name","").toLowerCase(Locale.ROOT),type=o.optString("type","").toLowerCase(Locale.ROOT);
-            if(name.equals(q)||type.equals(q)||name.contains(q))destroyedRuntimeObjects.add(o.optString("name",""));
+            if(runtimeTargetMatches(o,query,a))destroyedRuntimeObjects.add(o.optString("name",""));
         }
     }
     void runAction(String action){
@@ -412,6 +420,7 @@ public class MainActivity extends Activity {
                 if(overlap&&!type.equals("camera")&&!type.equals("light")&&!type.equals("player")){String key=type+":"+name;currentContacts.add(key);if(!previousContacts.contains(key))executePhase("collision",type);}
             }
         }
+        cleanupRuntimeSpawns();
         if(player!=null&&runtimePlayerY+ph>=500){runtimePlayerY=500-ph;runtimePlayerVY=0;runtimeGrounded=true;}
         previousContacts.clear();previousContacts.addAll(currentContacts);
         runtimeScore=(int)Math.round(runtimeVars.getOrDefault("Score",0d));runtimeLives=(int)Math.round(runtimeVars.getOrDefault("Lives",3d));
