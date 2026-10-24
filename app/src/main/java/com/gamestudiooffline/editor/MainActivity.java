@@ -757,7 +757,7 @@ public class MainActivity extends Activity {
             int idx=i;JSONObject e=a.optJSONObject(i);
             String shownAction=e.optString("customAction","").trim();if(shownAction.isEmpty())shownAction=e.optString("action","");
             String cond=e.optString("condition","").trim();
-            TextView t=card("🟩 KHI "+e.optString("trigger")+(cond.isEmpty()?"":"\\n🔎 NẾU "+cond)+"\\n🟦 LÀM "+shownAction);
+            TextView t=card("🟩 KHI "+e.optString("trigger")+(cond.isEmpty()?"":"\n🔎 NẾU "+cond)+"\n🟦 LÀM "+shownAction);
             root.addView(t);t.setOnClickListener(v->editEvent(idx));
             t.setOnLongClickListener(v->{new AlertDialog.Builder(this).setMessage("Xóa khối này?").setNegativeButton("Hủy",null).setPositiveButton("Xóa",(d,w)->{project.optJSONArray("events").remove(idx);save();editor();}).show();return true;});
         }
