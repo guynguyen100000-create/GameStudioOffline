@@ -786,25 +786,48 @@ public class MainActivity extends Activity {
         if(s.contains("lệnh tùy chỉnh"))return "Thực hiện câu lệnh dạng văn bản ở ô lệnh tùy chỉnh bên dưới.";
         return "Đây là việc game sẽ làm khi khối được kích hoạt và điều kiện (nếu có) đúng.";
     }
+    TextView scratchBlock(String title,String body,int color){
+        LinearLayout wrap=new LinearLayout(this);wrap.setOrientation(1);wrap.setPadding(dp(12),dp(9),dp(12),dp(9));
+        GradientDrawable shape=new GradientDrawable();shape.setColor(color);shape.setCornerRadius(dp(12));wrap.setBackground(shape);
+        TextView head=label(title,14,Color.WHITE,true);head.setPadding(dp(2),dp(2),dp(2),dp(5));wrap.addView(head);
+        TextView detail=label(body,13,Color.WHITE,false);detail.setPadding(dp(2),dp(2),dp(2),dp(2));wrap.addView(detail);
+        wrap.setContentDescription(title+". "+body);
+        // Return a TextView-like clickable card while keeping the stacked Scratch-style layout.
+        TextView card=new TextView(this);card.setText(title+"\n"+body);card.setTextSize(14);card.setTextColor(Color.WHITE);card.setTypeface(null,Typeface.BOLD);
+        card.setPadding(dp(14),dp(12),dp(14),dp(12));card.setBackground(shape);return card;
+    }
     void eventPanel(LinearLayout root){
-        root.addView(label("Khối sự kiện No-code",18,fg,true));
-        root.addView(label("Các khối được xếp theo thứ tự từ trên xuống. Chạm khối để sửa; nhấn giữ để xóa. Mỗi khối có giải thích bên dưới.",12,muted,false));
+        root.addView(label("Lập trình bằng các khối",19,fg,true));
+        root.addView(label("Phong cách kết hợp: khối màu dễ nhận biết, giải thích dễ hiểu và bố cục dọc kiểu Scratch dành cho điện thoại. Chạm khối để sửa; nhấn giữ để xóa.",12,muted,false));
+        root.addView(label("KHI = lúc nào chạy   •   NẾU = điều kiện   •   LÀM = hành động",13,fg,true));
         JSONArray a=project.optJSONArray("events");
         if(a!=null)for(int i=0;i<a.length();i++){
             int idx=i;JSONObject e=a.optJSONObject(i);
             String trigger=e.optString("trigger","");
             String shownAction=e.optString("customAction","").trim();if(shownAction.isEmpty())shownAction=e.optString("action","");
             String cond=e.optString("condition","").trim();
-            TextView t=card("🟨 KHI  "+trigger+"\n"+(cond.isEmpty()?"": "🔎 NẾU  "+cond+"\n")+"🟦 LÀM  "+shownAction+"\n\nⓘ Chạm để chỉnh sửa");
-            root.addView(t);t.setOnClickListener(v->editEvent(idx));
-            t.setOnLongClickListener(v->{new AlertDialog.Builder(this).setMessage("Xóa khối sự kiện này?").setNegativeButton("Hủy",null).setPositiveButton("Xóa",(d,w)->{project.optJSONArray("events").remove(idx);save();editor();}).show();return true;});
-            TextView explanation=card("💡 Giải thích\nKHI: "+explainTrigger(trigger)+"\nNẾU: "+explainCondition(cond)+"\nLÀM: "+explainAction(shownAction));
-            explanation.setTextSize(12);explanation.setTextColor(muted);
-            root.addView(explanation);
+            TextView triggerBlock=scratchBlock("🟨  KHI",trigger,Color.rgb(190,130,18));
+            root.addView(triggerBlock);triggerBlock.setOnClickListener(v->editEvent(idx));
+            TextView explanation=label(explainTrigger(trigger),12,muted,false);
+            explanation.setPadding(dp(14),dp(5),dp(8),dp(5));root.addView(explanation);
+            if(!cond.isEmpty()){
+                TextView connector=label("          ⋮",18,muted,true);root.addView(connector);
+                TextView conditionBlock=scratchBlock("🔎  NẾU",cond,Color.rgb(32,120,190));
+                root.addView(conditionBlock);conditionBlock.setOnClickListener(v->editEvent(idx));
+                TextView conditionHint=label(explainCondition(cond),12,muted,false);conditionHint.setPadding(dp(14),dp(5),dp(8),dp(5));root.addView(conditionHint);
+            }
+            TextView connector=label("          ⋮",18,muted,true);root.addView(connector);
+            TextView actionBlock=scratchBlock("🟦  LÀM",shownAction,Color.rgb(36,145,91));
+            root.addView(actionBlock);actionBlock.setOnClickListener(v->editEvent(idx));
+            TextView actionHint=label(explainAction(shownAction),12,muted,false);actionHint.setPadding(dp(14),dp(5),dp(8),dp(5));root.addView(actionHint);
+            TextView edit=label("✎ Chạm các khối để sửa  •  Nhấn giữ để xóa cả sự kiện",11,muted,false);root.addView(edit);
+            edit.setOnLongClickListener(v->{new AlertDialog.Builder(this).setMessage("Xóa khối sự kiện này?").setNegativeButton("Hủy",null).setPositiveButton("Xóa",(d,w)->{project.optJSONArray("events").remove(idx);save();editor();}).show();return true;});
+            triggerBlock.setOnLongClickListener(v->{new AlertDialog.Builder(this).setMessage("Xóa khối sự kiện này?").setNegativeButton("Hủy",null).setPositiveButton("Xóa",(d,w)->{project.optJSONArray("events").remove(idx);save();editor();}).show();return true;});
+            actionBlock.setOnLongClickListener(v->{new AlertDialog.Builder(this).setMessage("Xóa khối sự kiện này?").setNegativeButton("Hủy",null).setPositiveButton("Xóa",(d,w)->{project.optJSONArray("events").remove(idx);save();editor();}).show();return true;});
         }
-        root.addView(btn("+ Thêm sự kiện",()->editEvent(-1)));
-        root.addView(label("Mẹo đọc khối: KHI = lúc nào chạy; NẾU = điều kiện phải đúng; LÀM = việc cần thực hiện. Ví dụ Score >= 10 nghĩa là điểm từ 10 trở lên. && yêu cầu cả hai điều kiện đúng; || chỉ cần một điều kiện đúng.",12,muted,false));
-        root.addView(label("Lệnh tùy chỉnh: spawn Projectile at Player 260 0; follow Enemy Player 100; set Enemy.VX = 80; teleport Enemy 400 200; add Score 5; subtract Lives 1; hide Coin; show Enemy; respawn Player. Các lệnh nâng cao được thực thi trong lúc chơi thử; hãy thử từng lệnh để kiểm tra kết quả.",12,muted,false));
+        root.addView(btn("+ Thêm khối sự kiện",()->editEvent(-1)));
+        root.addView(label("Ví dụ: Score >= 10 nghĩa là điểm từ 10 trở lên. && yêu cầu cả hai điều kiện đúng; || chỉ cần một điều kiện đúng. Chọn “Khi điều kiện chuyển thành đúng” để chạy một lần khi điều kiện vừa đúng.",12,muted,false));
+        root.addView(label("Lệnh nâng cao (tùy chọn): spawn Projectile at Player 260 0; follow Enemy Player 100; set Enemy.VX = 80; teleport Enemy 400 200; add Score 5; subtract Lives 1; hide Coin; show Enemy; respawn Player.",12,muted,false));
     }
     void editEvent(int index){
         JSONArray existingEvents=project.optJSONArray("events");
