@@ -426,7 +426,7 @@ public class MainActivity extends Activity {
     String selectedName(){JSONArray a=objects();if(a.length()==0)return "(không có)";selected=Math.max(0,Math.min(selected,a.length()-1));return a.optJSONObject(selected).optString("name","Object");}
     void objectPanel(LinearLayout root){
         root.addView(label("Đối tượng trong cảnh",18,fg,true));JSONArray a=objects();
-        for(int i=0;i<a.length();i++){int idx=i;JSONObject o=a.optJSONObject(i);TextView t=card((i==selected?"● ":"○ ")+o.optString("name")+"  •  "+o.optString("type")+"\nX="+(int)o.optDouble("x")+"  Y="+(int)o.optDouble("y"));root.addView(t);t.setOnClickListener(v->{selected=idx;editor();});}
+        for(int i=0;i<a.length();i++){int idx=i;JSONObject o=a.optJSONObject(i);TextView t=card((i==selected?"● ":"○ ")+o.optString("name")+"  •  "+o.optString("type")+"\nX="+(int)o.optDouble("x")+"  Y="+(int)o.optDouble("y")+"\nVX="+o.optDouble("vx",0)+"  VY="+o.optDouble("vy",0)+"  HP="+o.optDouble("health",100));root.addView(t);t.setOnClickListener(v->{selected=idx;editor();});}
         root.addView(btn("+ Thêm đối tượng",()->new AlertDialog.Builder(this).setTitle("Loại đối tượng").setItems(new String[]{"Nhân vật","Enemy","Khối 3D","Coin","Nền sàn"},(d,w)->{if(w==0)add("Player","player",Color.BLUE);if(w==1)add("Enemy","enemy",Color.RED);if(w==2)add("Cube","cube",Color.rgb(110,130,255));if(w==3)add("Coin","coin",Color.YELLOW);if(w==4)add("Platform","platform",Color.GREEN);}).show()));
         root.addView(btn("Gán ảnh từ thư viện",this::importImage));
         root.addView(btn("Sửa thuộc tính",this::editObject));
@@ -451,7 +451,7 @@ public class MainActivity extends Activity {
         int oldColor=o.optInt("color",Color.BLUE), colorIndex=0;
         for(int i=0;i<colors.length;i++)if(colors[i]==oldColor){colorIndex=i;break;}
         color.setSelection(colorIndex);
-        for(Object[] pair:new Object[][]{{"Tên",n},{"Loại đối tượng",type},{"Màu",color},{"Vị trí X",x},{"Vị trí Y",y},{"Chiều rộng",w},{"Chiều cao",h},{"Máu ban đầu (Health)",health},{"Vận tốc X ban đầu",vx},{"Vận tốc Y ban đầu",vy}}){box.addView(label((String)pair[0],12,muted,false));box.addView((View)pair[1]);}
+        for(Object[] pair:new Object[][]{{"Tên",n},{"Loại đối tượng",type},{"Màu",color},{"Vị trí X",x},{"Vị trí Y",y},{"Chiều rộng",w},{"Chiều cao",h},{"Máu ban đầu (Health)",health},{"Vận tốc X ban đầu (đơn vị/giây)",vx},{"Vận tốc Y ban đầu (đơn vị/giây)",vy}}){box.addView(label((String)pair[0],12,muted,false));box.addView((View)pair[1]);}
         new AlertDialog.Builder(this).setTitle("Thuộc tính đối tượng").setView(box).setNegativeButton("Hủy",null).setPositiveButton("Lưu",(d,z)->{try{o.put("name",n.getText().toString().trim().isEmpty()?currentType:n.getText().toString().trim());o.put("type",types[type.getSelectedItemPosition()]);o.put("color",colors[color.getSelectedItemPosition()]);o.put("x",num(x));o.put("y",num(y));o.put("w",Math.max(1,num(w)));o.put("h",Math.max(1,num(h)));o.put("health",Math.max(0,num(health)));o.put("vx",num(vx));o.put("vy",num(vy));spriteCache.clear();save();editor();}catch(Exception ex){toast("Không lưu được thuộc tính");}}).show();
     }
     void duplicateSelected(){
