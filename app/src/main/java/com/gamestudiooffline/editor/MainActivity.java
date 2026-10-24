@@ -824,11 +824,57 @@ public class MainActivity extends Activity {
             edit.setOnLongClickListener(v->{new AlertDialog.Builder(this).setMessage("Xóa khối sự kiện này?").setNegativeButton("Hủy",null).setPositiveButton("Xóa",(d,w)->{project.optJSONArray("events").remove(idx);save();editor();}).show();return true;});
             triggerBlock.setOnLongClickListener(v->{new AlertDialog.Builder(this).setMessage("Xóa khối sự kiện này?").setNegativeButton("Hủy",null).setPositiveButton("Xóa",(d,w)->{project.optJSONArray("events").remove(idx);save();editor();}).show();return true;});
             actionBlock.setOnLongClickListener(v->{new AlertDialog.Builder(this).setMessage("Xóa khối sự kiện này?").setNegativeButton("Hủy",null).setPositiveButton("Xóa",(d,w)->{project.optJSONArray("events").remove(idx);save();editor();}).show();return true;});
+            LinearLayout eventControls=row();
+            eventControls.addView(btn("↑ Lên",()->moveEvent(idx,-1)));
+            eventControls.addView(btn("↓ Xuống",()->moveEvent(idx,1)));
+            eventControls.addView(btn("Sao chép",()->duplicateEvent(idx)));
+            HorizontalScrollView eventControlScroll=new HorizontalScrollView(this);
+            eventControlScroll.setHorizontalScrollBarEnabled(false);
+            eventControlScroll.addView(eventControls);
+            root.addView(eventControlScroll);
         }
         root.addView(btn("+ Thêm khối sự kiện",()->editEvent(-1)));
         root.addView(label("Ví dụ: Score >= 10 nghĩa là điểm từ 10 trở lên. && yêu cầu cả hai điều kiện đúng; || chỉ cần một điều kiện đúng. Chọn “Khi điều kiện chuyển thành đúng” để chạy một lần khi điều kiện vừa đúng.",12,muted,false));
         root.addView(label("Lệnh nâng cao (tùy chọn): spawn Projectile at Player 260 0; follow Enemy Player 100; set Enemy.VX = 80; teleport Enemy 400 200; add Score 5; subtract Lives 1; hide Coin; show Enemy; respawn Player.",12,muted,false));
     }
+    void moveEvent(int index,int offset){
+        JSONArray list=project.optJSONArray("events");
+        if(list==null){toast("Dự án chưa có khối sự kiện");return;}
+        int destination=index+offset;
+        if(index<0||index>=list.length()||destination<0||destination>=list.length()){
+            toast(offset<0?"Sự kiện đang ở đầu danh sách":"Sự kiện đang ở cuối danh sách");
+            return;
+        }
+        try{
+            Object current=list.opt(index),other=list.opt(destination);
+            list.put(index,other);
+            list.put(destination,current);
+            save();
+            editor();
+            toast("Đã đổi thứ tự sự kiện");
+        }catch(Exception e){toast("Không thể đổi thứ tự: "+e.getMessage());}
+    }
+
+    void duplicateEvent(int index){
+        JSONArray list=project.optJSONArray("events");
+        if(list==null||index<0||index>=list.length())return;
+        if(list.length()>=10000){toast("Đã đạt giới hạn 10000 sự kiện");return;}
+        JSONObject original=list.optJSONObject(index);
+        if(original==null){toast("Khối sự kiện không hợp lệ");return;}
+        try{
+            JSONObject copy=new JSONObject(original.toString());
+            JSONArray rebuilt=new JSONArray();
+            for(int i=0;i<list.length();i++){
+                rebuilt.put(list.opt(i));
+                if(i==index)rebuilt.put(copy);
+            }
+            project.put("events",rebuilt);
+            save();
+            editor();
+            toast("Đã sao chép sự kiện");
+        }catch(Exception e){toast("Không thể sao chép sự kiện: "+e.getMessage());}
+    }
+
     void editEvent(int index){
         JSONArray existingEvents=project.optJSONArray("events");
         if(existingEvents==null){existingEvents=new JSONArray();try{project.put("events",existingEvents);}catch(Exception ignored){}}
