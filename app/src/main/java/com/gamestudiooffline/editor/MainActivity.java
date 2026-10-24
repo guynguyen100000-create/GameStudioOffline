@@ -391,6 +391,30 @@ public class MainActivity extends Activity {
             if(runtimeTargetMatches(o,query,a))destroyedRuntimeObjects.add(o.optString("name",""));
         }
     }
+    void setRuntimeValue(String key,double value){
+        Matcher objectCoordinate=Pattern.compile("(?i)^([A-Za-z_][A-Za-z0-9_]*)\\\\.(X|Y|VX|VY|Health)$").matcher(key);
+        if(objectCoordinate.matches()){
+            String target=resolveLastHitTarget(objectCoordinate.group(1));
+            JSONObject object=findObject(target);
+            if(object!=null){
+                String property=objectCoordinate.group(2);
+                if(property.equalsIgnoreCase("Health"))setObjectHealth(target,value);
+                else if(property.equalsIgnoreCase("VX"))setObjectVelocity(target,true,value);
+                else if(property.equalsIgnoreCase("VY"))setObjectVelocity(target,false,value);
+                else setObjectCoordinate(target,property.equalsIgnoreCase("X"),value);
+                return;
+            }
+        }
+        if(key.equalsIgnoreCase("Player.X"))runtimePlayerX=value;
+        else if(key.equalsIgnoreCase("Player.Y"))runtimePlayerY=value;
+        else if(key.equalsIgnoreCase("Player.VY"))runtimePlayerVY=value;
+        else if(key.equalsIgnoreCase("Gravity"))runtimeGravity=Math.max(0,value);
+        else if(key.equalsIgnoreCase("MoveSpeed"))runtimeMoveSpeed=Math.max(0,value);
+        else if(key.equalsIgnoreCase("JumpStrength"))runtimeJumpStrength=Math.max(0,value);
+        else if(key.equalsIgnoreCase("TimeScale"))runtimeTimeScale=Math.max(0,Math.min(3,value));
+        else putRuntimeVar(key,value);
+    }
+
     void runAction(String action){
         String low=action.toLowerCase(Locale.ROOT);
         String command=action.trim();
@@ -404,18 +428,8 @@ public class MainActivity extends Activity {
         Matcher stopFollow=Pattern.compile("(?i)^stopfollow\\s+([A-Za-z_][A-Za-z0-9_]*)$").matcher(command);
         Matcher hide=Pattern.compile("(?i)^(hide|show|destroy)\\s+(.+)$").matcher(command);
         if(customSet.matches()){
-            String key=customSet.group(1);Double calculated=resolveValue(customSet.group(2));if(calculated==null)return;double value=calculated;
-            Matcher objectCoordinate=Pattern.compile("(?i)^([A-Za-z_][A-Za-z0-9_]*)\\.(X|Y|VX|VY|Health)$").matcher(key);
-            if(objectCoordinate.matches()&&findObject(resolveLastHitTarget(objectCoordinate.group(1)))!=null){String property=objectCoordinate.group(2);String target=resolveLastHitTarget(objectCoordinate.group(1));if(property.equalsIgnoreCase("Health"))setObjectHealth(target,value);else if(property.equalsIgnoreCase("VX"))setObjectVelocity(target,true,value);else if(property.equalsIgnoreCase("VY"))setObjectVelocity(target,false,value);else setObjectCoordinate(target,property.equalsIgnoreCase("X"),value);}
-            else if(key.equalsIgnoreCase("Player.X"))runtimePlayerX=value;
-            else if(key.equalsIgnoreCase("Player.Y"))runtimePlayerY=value;
-            else if(key.equalsIgnoreCase("Player.VY"))runtimePlayerVY=value;
-            else if(key.equalsIgnoreCase("Gravity"))runtimeGravity=Math.max(0,value);
-            else if(key.equalsIgnoreCase("MoveSpeed"))runtimeMoveSpeed=Math.max(0,value);
-            else if(key.equalsIgnoreCase("JumpStrength"))runtimeJumpStrength=Math.max(0,value);
-            else if(key.equalsIgnoreCase("TimeScale"))runtimeTimeScale=Math.max(0,Math.min(3,value));
-            else putRuntimeVar(key,value);
-            updateHudValues();return;
+            String key=customSet.group(1);Double calculated=resolveValue(customSet.group(2));if(calculated==null)return;
+            setRuntimeValue(key,calculated);updateHudValues();return;
         }
         if(customAdd.matches()||customSub.matches()){
             Matcher m=customAdd.matches()?customAdd:customSub;String key=m.group(1);Double operand=resolveValue(m.group(2));if(operand==null)return;double value=operand;
@@ -429,7 +443,10 @@ public class MainActivity extends Activity {
         if(hide.matches()){String verb=hide.group(1).toLowerCase(Locale.ROOT),target=hide.group(2);String actualTarget=resolveLastHitTarget(target);if(verb.equals("destroy"))destroyMatchingObjects(actualTarget);else hideMatchingObjects(actualTarget,verb.equals("hide"));updateHudValues();return;}
         if(command.equalsIgnoreCase("respawn Player")||command.equalsIgnoreCase("respawn player")){runtimePlayerX=runtimeSpawnX;runtimePlayerY=runtimeSpawnY;runtimePlayerVY=0;runtimeGrounded=false;updateHudValues();return;}
         Matcher set=Pattern.compile("(?i).*đặt(?:\\s+biến)?\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*([A-Za-z0-9_ .+*/()%\\-]+).*").matcher(action);
-        if(set.matches()){try{Double value=resolveValue(set.group(2));if(value!=null)putRuntimeVar(set.group(1),value);}catch(Exception ignored){}}
+        if(set.matches()){
+            Double value=resolveValue(set.group(2));
+            if(value!=null){setRuntimeValue(set.group(1),value);updateHudValues();return;}
+        }
         Matcher inc=Pattern.compile("(?i).*tăng\\s+([A-Za-z_][A-Za-z0-9_]*)\\s+thêm\\s+(-?\\d+(?:\\.\\d+)?).*").matcher(action);
         Matcher dec=Pattern.compile("(?i).*giảm\\s+([A-Za-z_][A-Za-z0-9_]*)\\s+đi\\s+(-?\\d+(?:\\.\\d+)?).*").matcher(action);
         if(inc.matches()){try{String key=inc.group(1);putRuntimeVar(key,(resolveValue(key)==null?0:resolveValue(key))+Double.parseDouble(inc.group(2)));}catch(Exception ignored){}}
@@ -440,9 +457,6 @@ public class MainActivity extends Activity {
         if(low.contains("hiện enemy"))hideMatchingObjects("enemy",false);
         if(low.contains("trừ")&&low.contains("mạng"))putRuntimeVar("Lives",(resolveValue("Lives")==null?3:resolveValue("Lives"))-1);
         if(low.contains("hồi sinh player")){runtimePlayerX=runtimeSpawnX;runtimePlayerY=runtimeSpawnY;runtimePlayerVY=0;runtimeGrounded=false;}
-        if(low.contains("gravity ="))runtimeGravity=950;
-        if(low.contains("movespeed ="))runtimeMoveSpeed=240;
-        if(low.contains("jumpstrength ="))runtimeJumpStrength=430;
         if(low.contains("nhảy")||low.contains("jump")){if(runtimeGrounded){runtimePlayerVY=-runtimeJumpStrength;runtimeGrounded=false;}}
         if(low.contains("di chuyển player")||low.contains("move player")){if(low.contains("sang trái")||low.contains("left"))runtimePlayerX-=3;else if(low.contains("sang phải")||low.contains("right"))runtimePlayerX+=3;else runtimePlayerX+=2;runtimePlayerX=Math.max(0,Math.min(900,runtimePlayerX));}
         if(low.equals("bắn projectile")){JSONObject p=findPlayer(),t=findObject("Projectile");double x=runtimePlayerX,y=runtimePlayerY;if(p!=null&&t!=null){double pw=Math.max(1,p.optDouble("w",48)),ph=Math.max(1,p.optDouble("h",60)),tw=Math.max(1,t.optDouble("w",20)),th=Math.max(1,t.optDouble("h",20));x=runtimePlayerX+pw;y=runtimePlayerY+(ph-th)/2;}spawnRuntimeObject("Projectile",x,y,260,0);updateHudValues();return;}
