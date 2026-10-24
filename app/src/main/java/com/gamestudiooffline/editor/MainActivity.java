@@ -451,7 +451,7 @@ public class MainActivity extends Activity {
     }
     void setRuntimeValue(String key,double value){
         if(!finiteNumber(value))return;
-        Matcher objectCoordinate=Pattern.compile("(?i)^([A-Za-z_][A-Za-z0-9_]*)\.(X|Y|VX|VY|Health)$").matcher(key);
+        Matcher objectCoordinate=Pattern.compile("(?i)^([A-Za-z_][A-Za-z0-9_]*)\\.(X|Y|VX|VY|Health)$").matcher(key);
         if(objectCoordinate.matches()){
             String target=resolveLastHitTarget(objectCoordinate.group(1));
             JSONObject object=findObject(target);
@@ -648,7 +648,8 @@ public class MainActivity extends Activity {
         top.addView(label(project.optString("name","Game"),16,fg,true),new LinearLayout.LayoutParams(0,-2,1));
         top.addView(btn("Lưu",()->{save();toast("Đã lưu ngoại tuyến");}));
         top.addView(btn(preview?"Dừng":"Chạy",()->{if(!preview)startRuntime();else stopRuntime();preview=!preview;editor();}));root.addView(top);
-        LinearLayout tabs=row();for(String t:new String[]{"2D","3D","Đối tượng","Sự kiện","Biến"})tabs.addView(btn(t,()->{tab=t;editor();}));root.addView(scroll(tabs));\n        root.addView(btn("✓ Kiểm tra dự án",this::validateProject));
+        LinearLayout tabs=row();for(String t:new String[]{"2D","3D","Đối tượng","Sự kiện","Biến"})tabs.addView(btn(t,()->{tab=t;editor();}));root.addView(scroll(tabs));
+        root.addView(btn("✓ Kiểm tra dự án",this::validateProject));
         if(preview){
             boolean preview3D=project.optString("dimension","2D").equals("3D");
             root.addView(label("CHẠY THỬ • Sự kiện đang được thực thi",12,Color.GREEN,true));
