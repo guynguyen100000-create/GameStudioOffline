@@ -221,7 +221,7 @@ public class MainActivity extends Activity {
         }catch(Exception e){toast("Không tạo được mẫu game: "+e.getMessage());}
     }
     int selected=0;
-    final String[] triggerChoices={"Khi bắt đầu cảnh","Mỗi khung hình","Mỗi 1 giây","Mỗi 5 giây","Mỗi 10 giây","Khi Player chạm Coin","Khi Player chạm Enemy","Khi Player chạm Cube","Khi Player chạm Platform","Khi Player chạm bất kỳ đối tượng nào","Khi Projectile chạm Enemy","Khi Enemy chạm Coin","Khi hai đối tượng chạm nhau","Khi bấm nút Nhảy","Khi bấm nút Bắn","Khi điều kiện chuyển thành đúng","Trong khi điều kiện đúng","Khi Player rơi khỏi màn hình"};
+    final String[] triggerChoices={"Khi bắt đầu cảnh","Mỗi khung hình","Mỗi 0.5 giây","Mỗi 1 giây","Mỗi 2 giây","Mỗi 3 giây","Mỗi 5 giây","Mỗi 10 giây","Khi Player chạm Coin","Khi Player chạm Enemy","Khi Player chạm Cube","Khi Player chạm Platform","Khi Player chạm bất kỳ đối tượng nào","Khi Projectile chạm Enemy","Khi Enemy chạm Coin","Khi hai đối tượng chạm nhau","Khi bấm nút Nhảy","Khi bấm nút Bắn","Khi điều kiện chuyển thành đúng","Trong khi điều kiện đúng","Khi Player rơi khỏi màn hình"};
     final String[] actionChoices={"Đặt biến Score = 0","Tăng Score thêm 1","Tăng Score thêm 10","Giảm Score đi 1","Đặt biến Lives = 3","Tăng Lives thêm 1","Ẩn Coin","Hiện Coin","Ẩn Enemy","Hiện Enemy","Cho Player nhảy","Trừ 1 mạng","Di chuyển Player","Di chuyển Player sang trái","Di chuyển Player sang phải","Hồi sinh Player","Đặt Gravity = 950","Đặt MoveSpeed = 240","Đặt JumpStrength = 430","Cho Enemy tự đi sang phải","Cho Enemy tự đi sang trái","Dừng Enemy","Cho Enemy đuổi theo Player","Dừng Enemy đuổi theo Player","Bắn Projectile","Trừ 10 máu Player","Trừ 25 máu Enemy","Trừ 25 máu Enemy vừa trúng","Hủy Projectile vừa trúng","Loại bỏ Enemy vừa trúng","Hồi 25 máu Player","Đưa Player về điểm xuất phát","Lệnh tùy chỉnh (xem ô bên dưới)"};
     // Runtime state is separate from editor data; play-testing never changes saved object positions.
     final Map<String,Double> runtimeVars = new HashMap<>();
@@ -641,7 +641,18 @@ public class MainActivity extends Activity {
     }
 
     JSONArray objects(){JSONArray a=project.optJSONArray("objects");if(a==null){a=new JSONArray();try{project.put("objects",a);}catch(Exception ignored){}}return a;}
-    void add(String n,String type,int color){try{JSONArray a=objects();a.put(obj(n+" "+(a.length()+1),type,220+(a.length()*47)%540,180+(a.length()*31)%230,type.equals("coin")?30:54,type.equals("coin")?30:54,color));selected=a.length()-1;save();editor();}catch(Exception ignored){}}
+    boolean objectNameExists(String candidate,JSONArray list,int exceptIndex){
+        if(candidate==null||list==null)return false;
+        for(int i=0;i<list.length();i++){if(i==exceptIndex)continue;JSONObject item=list.optJSONObject(i);if(item!=null&&item.optString("name","").trim().equalsIgnoreCase(candidate.trim()))return true;}
+        return false;
+    }
+    String uniqueObjectName(String preferred,JSONArray list,int exceptIndex){
+        String base=preferred==null?"":preferred.trim();if(base.isEmpty())base="Object";
+        if(!objectNameExists(base,list,exceptIndex))return base;
+        for(int suffix=2;suffix<100000;suffix++){String candidate=base+" "+suffix;if(!objectNameExists(candidate,list,exceptIndex))return candidate;}
+        return base+" "+System.currentTimeMillis();
+    }
+    void add(String n,String type,int color){try{JSONArray a=objects();String name=uniqueObjectName(n,a,-1);a.put(obj(name,type,220+(a.length()*47)%540,180+(a.length()*31)%230,type.equals("coin")?30:54,type.equals("coin")?30:54,color));selected=a.length()-1;save();editor();}catch(Exception ignored){}}
 
     void editor(){
         LinearLayout root=col();LinearLayout top=row();top.addView(btn("‹",this::home));
@@ -697,7 +708,7 @@ public class MainActivity extends Activity {
         for(int i=0;i<colors.length;i++)if(colors[i]==oldColor){colorIndex=i;break;}
         color.setSelection(colorIndex);
         for(Object[] pair:new Object[][]{{"Tên",n},{"Loại đối tượng",type},{"Màu",color},{"Vị trí X",x},{"Vị trí Y",y},{"Chiều rộng",w},{"Chiều cao",h},{"Máu ban đầu (Health)",health},{"Vận tốc X ban đầu (đơn vị/giây)",vx},{"Vận tốc Y ban đầu (đơn vị/giây)",vy}}){box.addView(label((String)pair[0],12,muted,false));box.addView((View)pair[1]);}
-        new AlertDialog.Builder(this).setTitle("Thuộc tính đối tượng").setView(box).setNegativeButton("Hủy",null).setPositiveButton("Lưu",(d,z)->{try{o.put("name",n.getText().toString().trim().isEmpty()?currentType:n.getText().toString().trim());o.put("type",types[type.getSelectedItemPosition()]);o.put("color",colors[color.getSelectedItemPosition()]);o.put("x",num(x));o.put("y",num(y));o.put("w",Math.max(1,num(w)));o.put("h",Math.max(1,num(h)));o.put("health",Math.max(0,num(health)));o.put("vx",num(vx));o.put("vy",num(vy));spriteCache.clear();save();editor();}catch(Exception ex){toast("Không lưu được thuộc tính");}}).show();
+        new AlertDialog.Builder(this).setTitle("Thuộc tính đối tượng").setView(box).setNegativeButton("Hủy",null).setPositiveButton("Lưu",(d,z)->{try{String newName=n.getText().toString().trim();if(newName.isEmpty()){toast("Tên đối tượng không được để trống");return;}if(objectNameExists(newName,a,selected)){toast("Tên đối tượng đã tồn tại: "+newName);return;}double nx=num(x),ny=num(y),nw=Math.max(1,num(w)),nh=Math.max(1,num(h)),hp=Math.max(0,num(health)),nvx=num(vx),nvy=num(vy);o.put("name",newName);o.put("type",types[type.getSelectedItemPosition()]);o.put("color",colors[color.getSelectedItemPosition()]);o.put("x",nx);o.put("y",ny);o.put("w",nw);o.put("h",nh);o.put("health",hp);o.put("vx",nvx);o.put("vy",nvy);spriteCache.clear();save();editor();}catch(Exception ex){toast("Các giá trị phải là số hợp lệ và hữu hạn");}}).show();
     }
     void duplicateSelected(){
         JSONArray a=objects();if(a.length()==0)return;
@@ -705,13 +716,13 @@ public class MainActivity extends Activity {
             selected=Math.max(0,Math.min(selected,a.length()-1));
             JSONObject source=a.optJSONObject(selected);
             JSONObject copy=new JSONObject(source.toString());
-            copy.put("name",source.optString("name","Object")+" copy");
+            copy.put("name",uniqueObjectName(source.optString("name","Object")+" copy",a,-1));
             copy.put("x",Math.min(900,source.optDouble("x")+24));
             copy.put("y",Math.min(500,source.optDouble("y")+24));
             a.put(copy);selected=a.length()-1;save();editor();toast("Đã nhân bản đối tượng");
         }catch(Exception ex){toast("Không nhân bản được đối tượng");}
     }
-    double num(EditText e){try{return Double.parseDouble(e.getText().toString());}catch(Exception ex){return 0;}}
+    double num(EditText e){double value=Double.parseDouble(e.getText().toString().trim());if(!finiteNumber(value))throw new NumberFormatException("Giá trị phải là số hữu hạn");return value;}
     JSONArray projectVariables(){
         JSONArray a=project.optJSONArray("variables");
         if(a==null){a=new JSONArray();try{project.put("variables",a);}catch(Exception ignored){}}
@@ -743,7 +754,7 @@ public class MainActivity extends Activity {
         box.addView(label("Giá trị ban đầu",12,muted,false));box.addView(value);
         new AlertDialog.Builder(this).setTitle(old==null?"Tạo biến":"Sửa biến").setView(box).setNegativeButton("Hủy",null).setPositiveButton("Lưu",(d,w)->{
             String n=name.getText().toString().trim();double v;
-            try{v=Double.parseDouble(value.getText().toString().trim());}catch(Exception ex){toast("Giá trị phải là số");return;}
+            try{v=Double.parseDouble(value.getText().toString().trim());if(!finiteNumber(v)){toast("Giá trị phải là số hữu hạn");return;}}catch(Exception ex){toast("Giá trị phải là số hữu hạn");return;}
             if(!n.matches("[A-Za-z_][A-Za-z0-9_]*")){toast("Tên biến không hợp lệ");return;}
             if(n.equalsIgnoreCase("Player")||n.equalsIgnoreCase("Gravity")||n.equalsIgnoreCase("MoveSpeed")||n.equalsIgnoreCase("JumpStrength")||n.equalsIgnoreCase("TimeScale")){toast("Tên này dành cho thuộc tính hệ thống");return;}
             for(int j=0;j<a.length();j++){if(j==index)continue;JSONObject other=a.optJSONObject(j);if(other!=null&&other.optString("name","").equalsIgnoreCase(n)){toast("Tên biến đã tồn tại");return;}}
