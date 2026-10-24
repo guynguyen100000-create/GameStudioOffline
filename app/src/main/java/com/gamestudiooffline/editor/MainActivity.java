@@ -120,8 +120,8 @@ public class MainActivity extends Activity {
         activeFile=new File(dir(),safe(project.optString("name","Imported"))+".gsproj");
         save();spriteCache.clear();tab=project.optString("dimension","2D");preview=false;selected=0;editor();toast("Đã nhập dự án và tài nguyên (nếu có)");
     }
-    LinearLayout col(){LinearLayout l=new LinearLayout(this);l.setOrientation(1);l.setPadding(dp(12),dp(8),dp(12),dp(12));l.setBackgroundColor(bg);return l;}
-    LinearLayout row(){LinearLayout l=new LinearLayout(this);l.setOrientation(0);l.setGravity(Gravity.CENTER_VERTICAL);return l;}
+    LinearLayout col(){LinearLayout l=new LinearLayout(this);l.setOrientation(LinearLayout.VERTICAL);l.setPadding(dp(12),dp(8),dp(12),dp(12));l.setBackgroundColor(bg);return l;}
+    LinearLayout row(){LinearLayout l=new LinearLayout(this);l.setOrientation(LinearLayout.HORIZONTAL);l.setGravity(Gravity.CENTER_VERTICAL);return l;}
     TextView label(String s,int size,int color,boolean bold){TextView t=new TextView(this);t.setText(s);t.setTextSize(size);t.setTextColor(color);t.setPadding(dp(3),dp(5),dp(3),dp(5));if(bold)t.setTypeface(null,Typeface.BOLD);return t;}
     Button btn(String s,Runnable r){Button b=new Button(this);b.setText(s);b.setTextSize(13);b.setTextColor(fg);b.setAllCaps(false);GradientDrawable d=new GradientDrawable();d.setColor(s.startsWith("+")||s.contains("Tạo")||s.equals("Lưu")||s.equals("Chạy")?accent:panel);d.setCornerRadius(dp(9));b.setBackground(d);b.setPadding(dp(8),0,dp(8),0);LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-2,-2);p.setMargins(dp(2),dp(3),dp(2),dp(3));b.setLayoutParams(p);b.setOnClickListener(v->r.run());return b;}
     ScrollView scroll(View v){ScrollView s=new ScrollView(this);s.setFillViewport(true);s.addView(v);return s;}
@@ -692,7 +692,7 @@ public class MainActivity extends Activity {
     EditText field(String s){EditText e=new EditText(this);e.setSingleLine(true);e.setText(s);e.setTextColor(fg);e.setBackgroundColor(panel);return e;}
     void editObject(){
         JSONArray a=objects();if(a.length()==0)return;selected=Math.max(0,Math.min(selected,a.length()-1));JSONObject o=a.optJSONObject(selected);
-        LinearLayout box=new LinearLayout(this);box.setPadding(dp(10),dp(6),dp(10),dp(6));box.setOrientation(1);
+        LinearLayout box=new LinearLayout(this);box.setPadding(dp(10),dp(6),dp(10),dp(6));box.setOrientation(LinearLayout.VERTICAL);
         EditText n=field(o.optString("name"));EditText x=field(""+(int)o.optDouble("x"));EditText y=field(""+(int)o.optDouble("y"));EditText w=field(""+(int)o.optDouble("w"));EditText h=field(""+(int)o.optDouble("h"));EditText health=field(""+(int)o.optDouble("health",100));EditText vx=field(""+o.optDouble("vx",0));EditText vy=field(""+o.optDouble("vy",0));
         String[] types={"player","enemy","cube","coin","platform","projectile"};
         String[] typeLabels={"Nhân vật (Player)","Kẻ địch (Enemy)","Khối 3D (Cube)","Vật phẩm (Coin)","Nền sàn (Platform)","Đạn (Projectile)"};
@@ -749,7 +749,7 @@ public class MainActivity extends Activity {
         EditText value=field(old==null?"0":Double.toString(old.optDouble("value",0)));
         name.setHint("Tên biến, ví dụ EnemyHP");
         value.setHint("Giá trị số ban đầu");
-        LinearLayout box=new LinearLayout(this);box.setOrientation(1);box.setPadding(dp(12),dp(8),dp(12),dp(8));
+        LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);box.setPadding(dp(12),dp(8),dp(12),dp(8));
         box.addView(label("Tên biến (chữ, số, dấu gạch dưới; không bắt đầu bằng số)",12,muted,false));box.addView(name);
         box.addView(label("Giá trị ban đầu",12,muted,false));box.addView(value);
         new AlertDialog.Builder(this).setTitle(old==null?"Tạo biến":"Sửa biến").setView(box).setNegativeButton("Hủy",null).setPositiveButton("Lưu",(d,w)->{
@@ -787,7 +787,7 @@ public class MainActivity extends Activity {
         return "Đây là việc game sẽ làm khi khối được kích hoạt và điều kiện (nếu có) đúng.";
     }
     TextView scratchBlock(String title,String body,int color){
-        LinearLayout wrap=new LinearLayout(this);wrap.setOrientation(1);wrap.setPadding(dp(12),dp(9),dp(12),dp(9));
+        LinearLayout wrap=new LinearLayout(this);wrap.setOrientation(LinearLayout.VERTICAL);wrap.setPadding(dp(12),dp(9),dp(12),dp(9));
         GradientDrawable shape=new GradientDrawable();shape.setColor(color);shape.setCornerRadius(dp(12));wrap.setBackground(shape);
         TextView head=label(title,14,Color.WHITE,true);head.setPadding(dp(2),dp(2),dp(2),dp(5));wrap.addView(head);
         TextView detail=label(body,13,Color.WHITE,false);detail.setPadding(dp(2),dp(2),dp(2),dp(2));wrap.addView(detail);
@@ -888,7 +888,7 @@ public class MainActivity extends Activity {
         condition.setHint("VD: Score >= 10 && Lives > 0");
         EditText customAction=field(old==null?"":old.optString("customAction",""));
         customAction.setHint("Lệnh tùy chỉnh, để trống dùng lựa chọn phía trên");
-        LinearLayout box=new LinearLayout(this);box.setOrientation(1);box.setPadding(dp(12),dp(8),dp(12),dp(8));
+        LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);box.setPadding(dp(12),dp(8),dp(12),dp(8));
         box.addView(label("KHI — Thời điểm / sự kiện",13,muted,true));box.addView(trigger);
         box.addView(label("NẾU — Điều kiện bổ sung (có thể để trống)",13,muted,true));box.addView(condition);
         box.addView(label("LÀM — Hành động",13,muted,true));box.addView(action);
