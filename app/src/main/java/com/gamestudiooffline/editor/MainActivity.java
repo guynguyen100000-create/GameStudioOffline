@@ -646,6 +646,26 @@ public class MainActivity extends Activity {
     }
 
     JSONArray objects(){JSONArray a=project.optJSONArray("objects");if(a==null){a=new JSONArray();try{project.put("objects",a);}catch(Exception ignored){}}return a;}
+    void moveSelectedLayer(int offset){
+        JSONArray list=objects();
+        if(list.length()==0){toast("Chưa có đối tượng trong cảnh");return;}
+        selected=Math.max(0,Math.min(selected,list.length()-1));
+        int destination=selected+offset;
+        if(destination<0||destination>=list.length()){
+            toast(offset>0?"Đối tượng đã ở lớp phía trước nhất":"Đối tượng đã ở lớp phía sau nhất");
+            return;
+        }
+        try{
+            Object current=list.opt(selected),other=list.opt(destination);
+            list.put(selected,other);
+            list.put(destination,current);
+            selected=destination;
+            save();
+            editor();
+            toast(offset>0?"Đã đưa đối tượng lên trước":"Đã đưa đối tượng ra sau");
+        }catch(Exception ex){toast("Không đổi được thứ tự lớp");}
+    }
+
     boolean objectNameExists(String candidate,JSONArray list,int exceptIndex){
         if(candidate==null||list==null)return false;
         for(int i=0;i<list.length();i++){if(i==exceptIndex)continue;JSONObject item=list.optJSONObject(i);if(item!=null&&item.optString("name","").trim().equalsIgnoreCase(candidate.trim()))return true;}
@@ -726,15 +746,23 @@ public class MainActivity extends Activity {
             root.addView(label("Kích thước: "+sceneWidth()+" × "+sceneHeight()+" px",12,muted,false));
             root.addView(label("Chạm trực tiếp vào đối tượng để chọn; kéo để đặt vị trí. Khi bật bắt dính, vị trí sẽ căn theo lưới.",12,muted,false));
             LinearLayout tools=row();tools.addView(btn("+ Player",()->add("Player","player",Color.BLUE)));tools.addView(btn("+ Enemy",()->add("Enemy","enemy",Color.RED)));tools.addView(btn("+ Khối",()->add("Cube","cube",Color.rgb(110,130,255))));tools.addView(btn("+ Coin",()->add("Coin","coin",Color.YELLOW)));tools.addView(btn("+ Nền",()->add("Platform","platform",Color.GREEN)));root.addView(scroll(tools));root.addView(btn("+ Thêm mẫu Đạn (Projectile)",()->add("Projectile","projectile",Color.YELLOW)));
-            root.addView(label("Đang chọn: "+selectedName(),14,fg,true));root.addView(btn("Sửa thuộc tính",this::editObject));root.addView(btn("Xuất dự án ZIP",this::exportZip));root.addView(btn("Xuất APK",this::apkNotice));
+            root.addView(label("Đang chọn: "+selectedName(),14,fg,true));
+            LinearLayout layerTools=row();layerTools.addView(btn("↑ Lên trước",()->moveSelectedLayer(1)));layerTools.addView(btn("↓ Ra sau",()->moveSelectedLayer(-1)));root.addView(layerTools);
+            root.addView(btn("Sửa thuộc tính",this::editObject));root.addView(btn("Xuất dự án ZIP",this::exportZip));root.addView(btn("Xuất APK",this::apkNotice));
         }else if(tab.equals("Đối tượng"))objectPanel(root);else if(tab.equals("Sự kiện"))eventPanel(root);else variablePanel(root);
         setContentView(scroll(root));
     }
     String selectedName(){JSONArray a=objects();if(a.length()==0)return "(không có)";selected=Math.max(0,Math.min(selected,a.length()-1));return a.optJSONObject(selected).optString("name","Object");}
     void objectPanel(LinearLayout root){
-        root.addView(label("Đối tượng trong cảnh",18,fg,true));JSONArray a=objects();
-        for(int i=0;i<a.length();i++){int idx=i;JSONObject o=a.optJSONObject(i);TextView t=card((i==selected?"● ":"○ ")+o.optString("name")+"  •  "+o.optString("type")+"\nX="+(int)o.optDouble("x")+"  Y="+(int)o.optDouble("y")+"\nVX="+o.optDouble("vx",0)+"  VY="+o.optDouble("vy",0)+"  HP="+o.optDouble("health",100));root.addView(t);t.setOnClickListener(v->{selected=idx;editor();});}
+        root.addView(label("Đối tượng trong cảnh",18,fg,true));
+        root.addView(label("Lớp 1 nằm phía sau; số lớp lớn hơn sẽ được vẽ phía trước.",12,muted,false));
+        JSONArray a=objects();
+        for(int i=0;i<a.length();i++){int idx=i;JSONObject o=a.optJSONObject(i);if(o==null)continue;TextView t=card((i==selected?"● ":"○ ")+o.optString("name")+"  •  "+o.optString("type")+"\nLớp "+(i+1)+"/"+a.length()+"\nX="+(int)o.optDouble("x")+"  Y="+(int)o.optDouble("y")+"\nVX="+o.optDouble("vx",0)+"  VY="+o.optDouble("vy",0)+"  HP="+o.optDouble("health",100));root.addView(t);t.setOnClickListener(v->{selected=idx;editor();});}
         root.addView(btn("+ Thêm đối tượng",()->new AlertDialog.Builder(this).setTitle("Loại đối tượng").setItems(new String[]{"Nhân vật","Enemy","Khối 3D","Coin","Nền sàn","Đạn (Projectile)"},(d,w)->{if(w==0)add("Player","player",Color.BLUE);if(w==1)add("Enemy","enemy",Color.RED);if(w==2)add("Cube","cube",Color.rgb(110,130,255));if(w==3)add("Coin","coin",Color.YELLOW);if(w==4)add("Platform","platform",Color.GREEN);if(w==5)add("Projectile","projectile",Color.YELLOW);}).show()));
+        LinearLayout layerButtons=row();
+        layerButtons.addView(btn("↑ Lên trước",()->moveSelectedLayer(1)));
+        layerButtons.addView(btn("↓ Ra sau",()->moveSelectedLayer(-1)));
+        root.addView(layerButtons);
         root.addView(btn("Gán ảnh từ thư viện",this::importImage));
         root.addView(btn("Sửa thuộc tính",this::editObject));
         root.addView(btn("Nhân bản đối tượng",this::duplicateSelected));
