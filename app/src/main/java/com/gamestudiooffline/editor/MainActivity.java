@@ -158,6 +158,7 @@ public class MainActivity extends Activity {
         return null;
     }
     void spawnRuntimeObject(String templateQuery,double x,double y,double vx,double vy){
+        if(runtimeSpawnedObjects.size()>=200)return;
         JSONObject template=null;JSONArray base=objects();String q=templateQuery.trim();
         for(int i=0;i<base.length();i++){JSONObject o=base.optJSONObject(i);if(o!=null&&o.optString("name","").equalsIgnoreCase(q)){template=o;break;}}
         if(template==null)for(int i=0;i<base.length();i++){JSONObject o=base.optJSONObject(i);if(o!=null&&o.optString("type","").equalsIgnoreCase(q)){template=o;break;}}
@@ -383,29 +384,35 @@ public class MainActivity extends Activity {
     void tickRuntime(){
         if(!runtimeStarted)startRuntime();
         long now=System.currentTimeMillis();double dt=Math.min(.05,Math.max(.001,(now-lastRuntimeTick)/1000d));lastRuntimeTick=now;
-        JSONObject player=findPlayer();if(player==null)return;
+        JSONObject player=findPlayer();
         executePhase("frame",null);
-        if(jumpRequested){executePhase("jump",null);if(runtimeGrounded){runtimePlayerVY=-runtimeJumpStrength;runtimeGrounded=false;}jumpRequested=false;}
-        double pw=Math.max(20,player.optDouble("w",48)),ph=Math.max(20,player.optDouble("h",60));
-        double oldBottom=runtimePlayerY+ph;
+        double pw=0,ph=0,oldBottom=runtimePlayerY;
+        if(player!=null){
+            if(jumpRequested){executePhase("jump",null);if(runtimeGrounded){runtimePlayerVY=-runtimeJumpStrength;runtimeGrounded=false;}jumpRequested=false;}
+            pw=Math.max(20,player.optDouble("w",48));ph=Math.max(20,player.optDouble("h",60));oldBottom=runtimePlayerY+ph;
+        }else jumpRequested=false;
         dt*=runtimeTimeScale;
-        runtimePlayerX=Math.max(0,Math.min(960-pw,runtimePlayerX+(moveAxis*runtimeMoveSpeed+runtimePlayerVX)*dt));
-        runtimePlayerVY=Math.min(1200,runtimePlayerVY+runtimeGravity*dt);
-        runtimePlayerY=Math.max(0,runtimePlayerY+runtimePlayerVY*dt);
-        runtimeGrounded=false;
+        if(player!=null){
+            runtimePlayerX=Math.max(0,Math.min(960-pw,runtimePlayerX+(moveAxis*runtimeMoveSpeed+runtimePlayerVX)*dt));
+            runtimePlayerVY=Math.min(1200,runtimePlayerVY+runtimeGravity*dt);
+            runtimePlayerY=Math.max(0,runtimePlayerY+runtimePlayerVY*dt);
+            runtimeGrounded=false;
+        }
         JSONArray all=runtimeSceneObjects();Set<String> currentContacts=new HashSet<>();
         for(int i=0;i<all.length();i++){
             JSONObject o=all.optJSONObject(i);if(o==null||o==player)continue;
             String type=o.optString("type","").toLowerCase(Locale.ROOT),name=o.optString("name","Object");
             if(hiddenRuntimeObjects.contains(name)||destroyedRuntimeObjects.contains(name))continue;
             runtimeObjectX.put(name,runtimeObjectCoordinate(o,true)+runtimeObjectVelocity(o,true)*dt);runtimeObjectY.put(name,runtimeObjectCoordinate(o,false)+runtimeObjectVelocity(o,false)*dt);
-            double ox=runtimeObjectCoordinate(o,true),oy=runtimeObjectCoordinate(o,false),ow=Math.max(1,o.optDouble("w")),oh=Math.max(1,o.optDouble("h"));
-            boolean overlap=runtimePlayerX<ox+ow&&runtimePlayerX+pw>ox&&runtimePlayerY<oy+oh&&runtimePlayerY+ph>oy;
-            boolean landedOnThisPlatform=type.equals("platform")&&runtimePlayerVY>=0&&oldBottom<=oy+12&&runtimePlayerY+ph>=oy&&runtimePlayerX+pw>ox&&runtimePlayerX<ox+ow;
-            if(landedOnThisPlatform){runtimePlayerY=oy-ph;runtimePlayerVY=0;runtimeGrounded=true;}
-            if(overlap&&!type.equals("camera")&&!type.equals("light")&&!type.equals("player")){String key=type+":"+name;currentContacts.add(key);if(!previousContacts.contains(key))executePhase("collision",type);}
+            if(player!=null){
+                double ox=runtimeObjectCoordinate(o,true),oy=runtimeObjectCoordinate(o,false),ow=Math.max(1,o.optDouble("w")),oh=Math.max(1,o.optDouble("h"));
+                boolean overlap=runtimePlayerX<ox+ow&&runtimePlayerX+pw>ox&&runtimePlayerY<oy+oh&&runtimePlayerY+ph>oy;
+                boolean landedOnThisPlatform=type.equals("platform")&&runtimePlayerVY>=0&&oldBottom<=oy+12&&runtimePlayerY+ph>=oy&&runtimePlayerX+pw>ox&&runtimePlayerX<ox+ow;
+                if(landedOnThisPlatform){runtimePlayerY=oy-ph;runtimePlayerVY=0;runtimeGrounded=true;}
+                if(overlap&&!type.equals("camera")&&!type.equals("light")&&!type.equals("player")){String key=type+":"+name;currentContacts.add(key);if(!previousContacts.contains(key))executePhase("collision",type);}
+            }
         }
-        if(runtimePlayerY+ph>=500){runtimePlayerY=500-ph;runtimePlayerVY=0;runtimeGrounded=true;}
+        if(player!=null&&runtimePlayerY+ph>=500){runtimePlayerY=500-ph;runtimePlayerVY=0;runtimeGrounded=true;}
         previousContacts.clear();previousContacts.addAll(currentContacts);
         runtimeScore=(int)Math.round(runtimeVars.getOrDefault("Score",0d));runtimeLives=(int)Math.round(runtimeVars.getOrDefault("Lives",3d));
     }
