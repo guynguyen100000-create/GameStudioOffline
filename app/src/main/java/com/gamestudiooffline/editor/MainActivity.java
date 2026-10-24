@@ -148,14 +148,16 @@ public class MainActivity extends Activity {
                 ev.put(templateEvent("Khi điều kiện chuyển thành đúng","Tăng Score thêm 10","", "LastHitEnemy.Health <= 0"));
                 ev.put(event("Khi Player chạm Enemy","Trừ 10 máu Player"));
                 ev.put(event("Khi Player chạm Coin","Tăng Score thêm 1"));
+                ev.put(event("Khi Player chạm Coin","Ẩn Coin"));
             }else{
                 ev.put(templateEvent("Khi bắt đầu cảnh","Lệnh tùy chỉnh (xem ô bên dưới)","follow Enemy Player 35",""));
                 ev.put(templateEvent("Khi bắt đầu cảnh","Lệnh tùy chỉnh (xem ô bên dưới)","follow Enemy2 Player 45",""));
                 ev.put(event("Khi Player chạm Coin","Tăng Score thêm 1"));
                 ev.put(templateEvent("Khi Player chạm Coin","Lệnh tùy chỉnh (xem ô bên dưới)","add Gold 5",""));
+                ev.put(event("Khi Player chạm Coin","Ẩn Coin"));
                 ev.put(event("Khi Player chạm Enemy","Trừ 10 máu Player"));
                 ev.put(templateEvent("Mỗi 5 giây","Lệnh tùy chỉnh (xem ô bên dưới)","set Player.Health = Player.Health + 5",""));
-                ev.put(templateEvent("Khi điều kiện chuyển thành đúng","Lệnh tùy chỉnh (xem ô bên dưới)","add Level 1","Score >= 10"));
+                ev.put(templateEvent("Khi điều kiện chuyển thành đúng","Lệnh tùy chỉnh (xem ô bên dưới)","add Level 1","Score >= Level * 10"));
             }
             project.put("events",ev);
             activeFile=new File(dir(),safe(n)+".gsproj");tab="2D";preview=false;selected=0;save();editor();
