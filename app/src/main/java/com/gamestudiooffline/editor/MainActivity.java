@@ -116,6 +116,7 @@ public class MainActivity extends Activity {
     final Map<String,Double> runtimeVars = new HashMap<>();
     final Map<String,Double> runtimeObjectX = new HashMap<>();
     final Map<String,Double> runtimeObjectY = new HashMap<>();
+    final Map<String,Double> runtimeObjectHealth = new HashMap<>();
     final Set<String> hiddenRuntimeObjects = new HashSet<>();
     final Set<String> destroyedRuntimeObjects = new HashSet<>();
     final Set<String> previousContacts = new HashSet<>();
@@ -133,7 +134,7 @@ public class MainActivity extends Activity {
         runtimeVars.clear();runtimeVars.put("Score",0d);runtimeVars.put("Lives",3d);runtimeVars.put("Timer",0d);
         JSONArray savedVars=project.optJSONArray("variables");
         if(savedVars!=null)for(int i=0;i<savedVars.length();i++){JSONObject v=savedVars.optJSONObject(i);if(v!=null){String n=v.optString("name","").trim();if(!n.isEmpty())putRuntimeVar(n,v.optDouble("value",0));}}
-        runtimeObjectX.clear();runtimeObjectY.clear();JSONArray sceneObjects=objects();for(int i=0;i<sceneObjects.length();i++){JSONObject o=sceneObjects.optJSONObject(i);if(o!=null){String n=o.optString("name","");runtimeObjectX.put(n,o.optDouble("x",0));runtimeObjectY.put(n,o.optDouble("y",0));}}
+        runtimeObjectX.clear();runtimeObjectY.clear();runtimeObjectHealth.clear();JSONArray sceneObjects=objects();for(int i=0;i<sceneObjects.length();i++){JSONObject o=sceneObjects.optJSONObject(i);if(o!=null){String n=o.optString("name","");runtimeObjectX.put(n,o.optDouble("x",0));runtimeObjectY.put(n,o.optDouble("y",0));runtimeObjectHealth.put(n,o.optDouble("health",100));}}
         hiddenRuntimeObjects.clear();destroyedRuntimeObjects.clear();previousContacts.clear();eventTimerLastFired.clear();eventConditionWasTrue.clear();
         runtimeScore=0;runtimeLives=3;runtimeGravity=950;runtimeMoveSpeed=240;runtimeJumpStrength=430;runtimeTimeScale=1;
         runtimePlayerVY=0;moveAxis=0;jumpRequested=false;runtimeGrounded=false;
@@ -142,7 +143,7 @@ public class MainActivity extends Activity {
         lastRuntimeTick=System.currentTimeMillis();runtimeStartMillis=lastRuntimeTick;runtimeStarted=true;
         executePhase("start",null);
     }
-    void stopRuntime(){runtimeStarted=false;moveAxis=0;jumpRequested=false;hiddenRuntimeObjects.clear();destroyedRuntimeObjects.clear();previousContacts.clear();runtimeObjectX.clear();runtimeObjectY.clear();}
+    void stopRuntime(){runtimeStarted=false;moveAxis=0;jumpRequested=false;hiddenRuntimeObjects.clear();destroyedRuntimeObjects.clear();previousContacts.clear();runtimeObjectX.clear();runtimeObjectY.clear();runtimeObjectHealth.clear();}
     JSONObject findObject(String query){
         if(query==null)return null;String q=query.trim();JSONArray a=objects();
         for(int i=0;i<a.length();i++){JSONObject o=a.optJSONObject(i);if(o!=null&&o.optString("name","").equalsIgnoreCase(q))return o;}
@@ -161,6 +162,8 @@ public class MainActivity extends Activity {
         (xAxis?runtimeObjectX:runtimeObjectY).put(o.optString("name",""),value);
     }
     void teleportObject(String query,double x,double y){JSONObject o=findObject(query);if(o==null)return;setObjectCoordinate(query,true,x);setObjectCoordinate(query,false,y);if(isPlayerObject(o))runtimePlayerVY=0;}
+    double runtimeObjectHealthValue(JSONObject o){if(o==null)return 0;return runtimeObjectHealth.getOrDefault(o.optString("name",""),o.optDouble("health",100));}
+    void setObjectHealth(String query,double value){JSONObject o=findObject(query);if(o!=null)runtimeObjectHealth.put(o.optString("name",""),value);}
     JSONObject findPlayer(){
         JSONArray a=objects();for(int i=0;i<a.length();i++){JSONObject o=a.optJSONObject(i);if(o!=null&&(o.optString("type").equalsIgnoreCase("player")||o.optString("name").equalsIgnoreCase("player")))return o;}return null;
     }
@@ -253,8 +256,8 @@ public class MainActivity extends Activity {
         try{return Double.parseDouble(s);}catch(Exception ignored){}
         if("Player.X".equalsIgnoreCase(s))return runtimePlayerX;
         if("Player.Y".equalsIgnoreCase(s))return runtimePlayerY;
-        Matcher objectCoordinate=Pattern.compile("^([A-Za-z_][A-Za-z0-9_]*)\\.(X|Y)$",Pattern.CASE_INSENSITIVE).matcher(s);
-        if(objectCoordinate.matches()){JSONObject o=findObject(objectCoordinate.group(1));if(o!=null)return runtimeObjectCoordinate(o,objectCoordinate.group(2).equalsIgnoreCase("X"));}
+        Matcher objectCoordinate=Pattern.compile("^([A-Za-z_][A-Za-z0-9_]*)\\.(X|Y|Health)$",Pattern.CASE_INSENSITIVE).matcher(s);
+        if(objectCoordinate.matches()){JSONObject o=findObject(objectCoordinate.group(1));if(o!=null){String property=objectCoordinate.group(2);if(property.equalsIgnoreCase("Health"))return runtimeObjectHealthValue(o);return runtimeObjectCoordinate(o,property.equalsIgnoreCase("X"));}}
         if("Player.VY".equalsIgnoreCase(s))return runtimePlayerVY;
         if("Timer".equalsIgnoreCase(s))return Math.max(0,(System.currentTimeMillis()-runtimeStartMillis)/1000d);
         for(Map.Entry<String,Double> entry:runtimeVars.entrySet())if(entry.getKey().equalsIgnoreCase(s))return entry.getValue();
@@ -309,8 +312,8 @@ public class MainActivity extends Activity {
         Matcher hide=Pattern.compile("(?i)^(hide|show|destroy)\\s+(.+)$").matcher(command);
         if(customSet.matches()){
             String key=customSet.group(1);Double calculated=resolveValue(customSet.group(2));if(calculated==null)return;double value=calculated;
-            Matcher objectCoordinate=Pattern.compile("(?i)^([A-Za-z_][A-Za-z0-9_]*)\\.(X|Y)$").matcher(key);
-            if(objectCoordinate.matches()&&findObject(objectCoordinate.group(1))!=null)setObjectCoordinate(objectCoordinate.group(1),objectCoordinate.group(2).equalsIgnoreCase("X"),value);
+            Matcher objectCoordinate=Pattern.compile("(?i)^([A-Za-z_][A-Za-z0-9_]*)\\.(X|Y|Health)$").matcher(key);
+            if(objectCoordinate.matches()&&findObject(objectCoordinate.group(1))!=null){String property=objectCoordinate.group(2);if(property.equalsIgnoreCase("Health"))setObjectHealth(objectCoordinate.group(1),value);else setObjectCoordinate(objectCoordinate.group(1),property.equalsIgnoreCase("X"),value);}
             else if(key.equalsIgnoreCase("Player.X"))runtimePlayerX=value;
             else if(key.equalsIgnoreCase("Player.Y"))runtimePlayerY=value;
             else if(key.equalsIgnoreCase("Player.VY"))runtimePlayerVY=value;
@@ -506,7 +509,7 @@ public class MainActivity extends Activity {
         }
         root.addView(btn("+ Thêm sự kiện",()->editEvent(-1)));
         root.addView(label("Điều kiện hỗ trợ: Score >= 10, Lives <= 0, Timer > 5, Player.X >= 300; kết hợp &&, ||, ! và dấu ngoặc. Chọn 'Khi điều kiện chuyển thành đúng' để chạy một lần khi điều kiện vừa đúng.",12,muted,false));
-        root.addView(label("Lệnh tùy chỉnh: set Score = 10; add Score 5; subtract Lives 1; set Player.X = 100; set Enemy.X = Player.X + 80; set Coin.Y = Coin.Y - 3; teleport Enemy 400 200; set Gravity = 800; set MoveSpeed = 300; set JumpStrength = 500; set TimeScale = 0.5; hide Coin; show Enemy; destroy Enemy; respawn Player. Tên đối tượng dùng trong lệnh tọa độ nên viết liền, không dấu cách.",12,muted,false));
+        root.addView(label("Lệnh tùy chỉnh: set Score = 10; add Score 5; subtract Lives 1; set Player.X = 100; set Enemy.X = Player.X + 80; set Coin.Y = Coin.Y - 3; teleport Enemy 400 200; set Enemy.Health = Enemy.Health - 25; destroy Enemy. Máu của mỗi đối tượng mặc định 100; dùng điều kiện Enemy.Health <= 0 với hành động destroy Enemy để loại kẻ địch. Tên đối tượng trong lệnh phải viết liền, không dấu cách. Các lệnh khác: set Gravity = 800; set MoveSpeed = 300; set JumpStrength = 500; set TimeScale = 0.5; hide Coin; show Enemy; respawn Player.",12,muted,false));
     }
     void editEvent(int index){
         JSONArray existingEvents=project.optJSONArray("events");
