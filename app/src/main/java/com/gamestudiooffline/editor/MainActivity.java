@@ -25,6 +25,9 @@ public class MainActivity extends Activity {
 
     boolean finiteNumber(double value){return !Double.isNaN(value)&&!Double.isInfinite(value);}
     double snapCoordinate(double value){int step=Math.max(1,snapGridSize);return snapToGrid?Math.round(value/step)*(double)step:value;}
+    int sceneWidth(){return project==null?960:Math.max(1,project.optInt("width",960));}
+    int sceneHeight(){return project==null?540:Math.max(1,project.optInt("height",540));}
+    int sceneBackgroundColor(){return project==null?Color.rgb(100,180,242):project.optInt("backgroundColor",Color.rgb(100,180,242));}
 
     int dp(float n){return (int)(n*getResources().getDisplayMetrics().density+.5f);}
     @Override public void onCreate(Bundle b){super.onCreate(b);getWindow().setStatusBarColor(bg);getWindow().setNavigationBarColor(bg);home();}
@@ -154,7 +157,7 @@ public class MainActivity extends Activity {
     void create(String dimension){
         String n=nameBox.getText().toString().trim();if(n.isEmpty())n=dimension.equals("3D")?"My3DGame":"MyGame";
         try{
-            project=new JSONObject();project.put("schema",1);project.put("name",n);project.put("dimension",dimension);project.put("width",960);project.put("height",540);
+            project=new JSONObject();project.put("schema",1);project.put("name",n);project.put("dimension",dimension);project.put("width",960);project.put("height",540);project.put("backgroundColor",Color.rgb(100,180,242));
             JSONArray os=new JSONArray();
             if(dimension.equals("2D")){os.put(obj("Player","player",130,350,48,60,Color.rgb(40,132,255)));os.put(obj("Ground","platform",0,465,960,75,Color.rgb(56,174,99)));os.put(obj("Coin","coin",500,340,32,32,Color.YELLOW));}
             else{os.put(obj("Camera","camera",0,0,0,0,Color.WHITE));os.put(obj("Light","light",0,0,0,0,Color.YELLOW));os.put(obj("Cube","cube",430,260,90,90,Color.rgb(52,138,255)));os.put(obj("Cube 2","cube",580,330,65,65,Color.rgb(255,128,70)));}
@@ -181,7 +184,7 @@ public class MainActivity extends Activity {
         String n=nameBox.getText().toString().trim();boolean shooter="shooter".equals(kind),tower="tower".equals(kind);
         if(n.isEmpty())n=shooter?"ShooterStarter":tower?"TowerDefenseStarter":"RPGStarter";
         try{
-            project=new JSONObject();project.put("schema",1);project.put("name",n);project.put("dimension","2D");project.put("width",960);project.put("height",540);
+            project=new JSONObject();project.put("schema",1);project.put("name",n);project.put("dimension","2D");project.put("width",960);project.put("height",540);project.put("backgroundColor",Color.rgb(100,180,242));
             JSONArray os=new JSONArray();
             if(!tower)os.put(sceneObject("Player","player",75,350,48,60,Color.rgb(40,132,255),100,0,0));
             os.put(sceneObject("Ground","platform",0,465,960,75,Color.rgb(56,174,99),100,0,0));
@@ -270,7 +273,7 @@ public class MainActivity extends Activity {
         return exactNameExists?name.equals(q):(type.equals(q)||name.contains(q));
     }
     void cleanupRuntimeSpawns(){
-        java.util.Iterator<JSONObject> it=runtimeSpawnedObjects.iterator();while(it.hasNext()){JSONObject o=it.next();String n=o.optString("name","");double x=runtimeObjectCoordinate(o,true),y=runtimeObjectCoordinate(o,false);if(destroyedRuntimeObjects.contains(n)||x < -160||x > 1120||y < -160||y > 700){it.remove();runtimeObjectX.remove(n);runtimeObjectY.remove(n);runtimeObjectVX.remove(n);runtimeObjectVY.remove(n);runtimeObjectHealth.remove(n);runtimeFollowSpeed.remove(n);hiddenRuntimeObjects.remove(n);destroyedRuntimeObjects.remove(n);previousContacts.remove(o.optString("type","")+":"+n);previousContacts.removeIf(k->k.contains(n));}}
+        java.util.Iterator<JSONObject> it=runtimeSpawnedObjects.iterator();while(it.hasNext()){JSONObject o=it.next();String n=o.optString("name","");double x=runtimeObjectCoordinate(o,true),y=runtimeObjectCoordinate(o,false);if(destroyedRuntimeObjects.contains(n)||x < -160||x > sceneWidth()+160||y < -160||y > sceneHeight()+160){it.remove();runtimeObjectX.remove(n);runtimeObjectY.remove(n);runtimeObjectVX.remove(n);runtimeObjectVY.remove(n);runtimeObjectHealth.remove(n);runtimeFollowSpeed.remove(n);hiddenRuntimeObjects.remove(n);destroyedRuntimeObjects.remove(n);previousContacts.remove(o.optString("type","")+":"+n);previousContacts.removeIf(k->k.contains(n));}}
     }
     JSONObject findObject(String query){
         if(query==null)return null;String q=query.trim();JSONArray a=objects();
@@ -334,7 +337,7 @@ public class MainActivity extends Activity {
                         long previous=eventTimerLastFired.getOrDefault(i,runtimeStartMillis);
                         if(now-previous>=interval*1000){match=true;eventTimerLastFired.put(i,now);}
                     }else if(trigger.contains("player rơi khỏi màn hình")){
-                        boolean fell=runtimePlayerY>560;
+                        boolean fell=runtimePlayerY>sceneHeight()+20;
                         boolean wasFallen=eventConditionWasTrue.getOrDefault(i,false);
                         eventConditionWasTrue.put(i,fell);match=fell&&!wasFallen;
                     }
@@ -529,7 +532,7 @@ public class MainActivity extends Activity {
         if(low.contains("trừ")&&low.contains("mạng"))putRuntimeVar("Lives",(resolveValue("Lives")==null?3:resolveValue("Lives"))-1);
         if(low.contains("hồi sinh player")){runtimePlayerX=runtimeSpawnX;runtimePlayerY=runtimeSpawnY;runtimePlayerVY=0;runtimeGrounded=false;}
         if(low.contains("nhảy")||low.contains("jump")){if(runtimeGrounded){runtimePlayerVY=-runtimeJumpStrength;runtimeGrounded=false;}}
-        if(low.contains("di chuyển player")||low.contains("move player")){if(low.contains("sang trái")||low.contains("left"))runtimePlayerX-=3;else if(low.contains("sang phải")||low.contains("right"))runtimePlayerX+=3;else runtimePlayerX+=2;runtimePlayerX=Math.max(0,Math.min(900,runtimePlayerX));}
+        if(low.contains("di chuyển player")||low.contains("move player")){if(low.contains("sang trái")||low.contains("left"))runtimePlayerX-=3;else if(low.contains("sang phải")||low.contains("right"))runtimePlayerX+=3;else runtimePlayerX+=2;runtimePlayerX=Math.max(0,Math.min(sceneWidth()-1,runtimePlayerX));}
         if(low.equals("bắn projectile")){JSONObject p=findPlayer(),t=findObject("Projectile");double x=runtimePlayerX,y=runtimePlayerY;if(p!=null&&t!=null){double pw=Math.max(1,p.optDouble("w",48)),ph=Math.max(1,p.optDouble("h",60)),tw=Math.max(1,t.optDouble("w",20)),th=Math.max(1,t.optDouble("h",20));x=runtimePlayerX+pw;y=runtimePlayerY+(ph-th)/2;}spawnRuntimeObject("Projectile",x,y,260,0);updateHudValues();return;}
         if(low.contains("dừng enemy đuổi theo player")){JSONObject enemy=findObject("Enemy");if(enemy!=null){String n=enemy.optString("name","");runtimeFollowSpeed.remove(n);setObjectVelocity(n,true,0);setObjectVelocity(n,false,0);}}
         if(low.contains("cho enemy đuổi theo player")){JSONObject enemy=findObject("Enemy");if(enemy!=null)runtimeFollowSpeed.put(enemy.optString("name",""),100d);}
@@ -561,7 +564,7 @@ public class MainActivity extends Activity {
         }else jumpRequested=false;
         dt*=runtimeTimeScale;
         if(player!=null){
-            runtimePlayerX=Math.max(0,Math.min(960-pw,runtimePlayerX+(moveAxis*runtimeMoveSpeed+runtimePlayerVX)*dt));
+            runtimePlayerX=Math.max(0,Math.min(sceneWidth()-pw,runtimePlayerX+(moveAxis*runtimeMoveSpeed+runtimePlayerVX)*dt));
             runtimePlayerVY=Math.min(1200,runtimePlayerVY+runtimeGravity*dt);
             runtimePlayerY=Math.max(0,runtimePlayerY+runtimePlayerVY*dt);
             runtimeGrounded=false;
@@ -654,7 +657,46 @@ public class MainActivity extends Activity {
         for(int suffix=2;suffix<100000;suffix++){String candidate=base+" "+suffix;if(!objectNameExists(candidate,list,exceptIndex))return candidate;}
         return base+" "+System.currentTimeMillis();
     }
-    void add(String n,String type,int color){try{JSONArray a=objects();String name=uniqueObjectName(n,a,-1);a.put(obj(name,type,220+(a.length()*47)%540,180+(a.length()*31)%230,type.equals("coin")?30:54,type.equals("coin")?30:54,color));selected=a.length()-1;save();editor();}catch(Exception ignored){}}
+    void add(String n,String type,int color){try{JSONArray a=objects();String name=uniqueObjectName(n,a,-1);double x=Math.min(Math.max(0,sceneWidth()-54),220+(a.length()*47)%Math.max(1,sceneWidth()-200));double y=Math.min(Math.max(0,sceneHeight()-54),180+(a.length()*31)%Math.max(1,sceneHeight()-180));a.put(obj(name,type,x,y,type.equals("coin")?30:54,type.equals("coin")?30:54,color));selected=a.length()-1;save();editor();}catch(Exception ignored){}}
+
+    void editSceneSettings(){
+        int[] colors={
+            Color.rgb(100,180,242),
+            Color.rgb(25,31,48),
+            Color.rgb(92,66,150),
+            Color.rgb(232,207,154),
+            Color.rgb(120,176,130),
+            Color.rgb(205,212,222)
+        };
+        String[] colorNames={"Xanh da trời","Tối","Tím","Cát","Xanh lá","Xám"};
+        EditText width=field(Integer.toString(sceneWidth()));
+        EditText height=field(Integer.toString(sceneHeight()));
+        width.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+        height.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+        Spinner background=new Spinner(this);
+        background.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,colorNames));
+        for(int i=0;i<colors.length;i++)if(colors[i]==sceneBackgroundColor()){background.setSelection(i);break;}
+        LinearLayout box=new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(12),dp(8),dp(12),dp(8));
+        box.addView(label("Chiều rộng cảnh (320–3840 px)",12,muted,false));box.addView(width);
+        box.addView(label("Chiều cao cảnh (240–2160 px)",12,muted,false));box.addView(height);
+        box.addView(label("Màu nền cảnh",12,muted,false));box.addView(background);
+        new AlertDialog.Builder(this).setTitle("Thiết lập màn chơi").setView(box)
+            .setNegativeButton("Hủy",null).setPositiveButton("Lưu",(d,w)->{
+                try{
+                    int newWidth=Integer.parseInt(width.getText().toString().trim());
+                    int newHeight=Integer.parseInt(height.getText().toString().trim());
+                    if(newWidth<320||newWidth>3840||newHeight<240||newHeight>2160){
+                        toast("Kích thước ngoài giới hạn cho phép");return;
+                    }
+                    project.put("width",newWidth);
+                    project.put("height",newHeight);
+                    project.put("backgroundColor",colors[background.getSelectedItemPosition()]);
+                    save();editor();toast("Đã lưu thiết lập màn chơi");
+                }catch(Exception ex){toast("Kích thước cảnh phải là số nguyên hợp lệ");}
+            }).show();
+    }
 
     void editor(){
         LinearLayout root=col();LinearLayout top=row();top.addView(btn("‹",this::home));
@@ -680,6 +722,8 @@ public class MainActivity extends Activity {
             sceneSettings.addView(btn("Bắt dính: "+(snapToGrid?"BẬT":"TẮT"),()->{snapToGrid=!snapToGrid;editor();}));
             sceneSettings.addView(btn("Lưới: "+snapGridSize+" px",()->{snapGridSize=snapGridSize==10?20:(snapGridSize==20?40:10);editor();}));
             root.addView(scroll(sceneSettings));
+            root.addView(btn("⚙ Thiết lập màn chơi",this::editSceneSettings));
+            root.addView(label("Kích thước: "+sceneWidth()+" × "+sceneHeight()+" px",12,muted,false));
             root.addView(label("Chạm trực tiếp vào đối tượng để chọn; kéo để đặt vị trí. Khi bật bắt dính, vị trí sẽ căn theo lưới.",12,muted,false));
             LinearLayout tools=row();tools.addView(btn("+ Player",()->add("Player","player",Color.BLUE)));tools.addView(btn("+ Enemy",()->add("Enemy","enemy",Color.RED)));tools.addView(btn("+ Khối",()->add("Cube","cube",Color.rgb(110,130,255))));tools.addView(btn("+ Coin",()->add("Coin","coin",Color.YELLOW)));tools.addView(btn("+ Nền",()->add("Platform","platform",Color.GREEN)));root.addView(scroll(tools));root.addView(btn("+ Thêm mẫu Đạn (Projectile)",()->add("Projectile","projectile",Color.YELLOW)));
             root.addView(label("Đang chọn: "+selectedName(),14,fg,true));root.addView(btn("Sửa thuộc tính",this::editObject));root.addView(btn("Xuất dự án ZIP",this::exportZip));root.addView(btn("Xuất APK",this::apkNotice));
@@ -724,8 +768,8 @@ public class MainActivity extends Activity {
             JSONObject source=a.optJSONObject(selected);
             JSONObject copy=new JSONObject(source.toString());
             copy.put("name",uniqueObjectName(source.optString("name","Object")+" copy",a,-1));
-            copy.put("x",Math.min(900,source.optDouble("x")+24));
-            copy.put("y",Math.min(500,source.optDouble("y")+24));
+            copy.put("x",Math.min(Math.max(0,sceneWidth()-Math.max(1,source.optDouble("w",1))),source.optDouble("x")+24));
+            copy.put("y",Math.min(Math.max(0,sceneHeight()-Math.max(1,source.optDouble("h",1))),source.optDouble("y")+24));
             a.put(copy);selected=a.length()-1;save();editor();toast("Đã nhân bản đối tượng");
         }catch(Exception ex){toast("Không nhân bản được đối tượng");}
     }
@@ -924,18 +968,18 @@ public class MainActivity extends Activity {
     class SceneView extends View{
         Paint p=new Paint(3);boolean run,three;float dx,dy;double sx,sy;boolean drag;
         SceneView(boolean r,boolean d){super(MainActivity.this);run=r;three=d;setBackgroundColor(bg);}
-        @Override protected void onDraw(Canvas c){super.onDraw(c);c.drawColor(Color.rgb(20,33,51));if(run)tickRuntime();float scale=Math.min(getWidth()/960f,getHeight()/540f);if(scale<=0)return;c.save();c.translate((getWidth()-960*scale)/2,(getHeight()-540*scale)/2);c.scale(scale,scale);if(three)draw3(c);else draw2(c);c.restore();p.setColor(muted);p.setTextSize(18);c.drawText(run?(three?"CHẠY THỬ 3D":"CHẠY THỬ 2D"):(three?"3D VIEW":"2D SCENE"),12,24,p);if(run){p.setColor(Color.WHITE);p.setTextSize(20);String extraHud="";if(runtimeVars.containsKey("Gold"))extraHud+="   Gold: "+(int)Math.round(runtimeVars.getOrDefault("Gold",0d));if(runtimeVars.containsKey("Level"))extraHud+="   Level: "+(int)Math.round(runtimeVars.getOrDefault("Level",1d));c.drawText("Score: "+runtimeScore+"   Lives: "+runtimeLives+(findPlayer()!=null?"   HP: "+(int)Math.round(runtimeObjectHealthValue(findPlayer())):"")+extraHud,12,52,p);if(runtimeGameOver){p.setColor(Color.RED);p.setTextSize(38);c.drawText("GAME OVER",Math.max(12,getWidth()/2f-105),getHeight()/2f,p);}postInvalidateDelayed(40);}}
-        void draw2(Canvas c){p.setColor(Color.rgb(100,180,242));c.drawRect(0,0,960,540,p);p.setColor(Color.rgb(129,201,252));int grid=Math.max(10,Math.min(80,snapGridSize));for(int x=0;x<=960;x+=grid)c.drawLine(x,0,x,540,p);for(int y=0;y<=540;y+=grid)c.drawLine(0,y,960,y,p);JSONArray a=run?runtimeSceneObjects():objects();for(int i=0;i<a.length();i++){JSONObject o=a.optJSONObject(i);if(o==null||(run&&(hiddenRuntimeObjects.contains(o.optString("name"))||destroyedRuntimeObjects.contains(o.optString("name")))))continue;float x=(float)(run?runtimeObjectCoordinate(o,true):o.optDouble("x")),y=(float)(run?runtimeObjectCoordinate(o,false):o.optDouble("y")),w=(float)o.optDouble("w"),h=(float)o.optDouble("h");String type=o.optString("type");p.setColor(o.optInt("color",Color.WHITE));Bitmap sprite=loadSprite(o.optString("image",""));if(sprite!=null)c.drawBitmap(sprite,null,new RectF(x,y,x+Math.max(1,w),y+Math.max(1,h)),p);else if(type.equals("coin")||type.equals("projectile"))c.drawCircle(x+w/2,y+h/2,Math.max(w,h)/2,p);else if(type.equals("platform")){c.drawRect(x,y,x+Math.max(40,w),y+Math.max(20,h),p);p.setColor(Color.rgb(117,73,45));c.drawRect(x,y+h*.6f,x+Math.max(40,w),y+Math.max(20,h),p);}else if(type.equals("camera")||type.equals("light")){p.setTextSize(25);c.drawText(type.equals("camera")?"CAM":"LGT",x+8,y+32,p);}else{c.drawRoundRect(x,y,x+Math.max(34,w),y+Math.max(34,h),8,8,p);p.setColor(Color.WHITE);p.setTextSize(13);c.drawText(o.optString("name"),x,y-4,p);}if(run&&(type.equals("enemy")||type.equals("player")))drawRuntimeHealthBar(c,o,x,y,Math.max(34,w));if(!run&&i==selected){p.setColor(Color.WHITE);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(3);c.drawRect(x-4,y-4,x+Math.max(34,w)+4,y+Math.max(34,h)+4,p);p.setStyle(Paint.Style.FILL);}}}
+        @Override protected void onDraw(Canvas c){super.onDraw(c);c.drawColor(Color.rgb(20,33,51));if(run)tickRuntime();int sw=sceneWidth(),sh=sceneHeight();float scale=Math.min(getWidth()/(float)sw,getHeight()/(float)sh);if(scale<=0)return;c.save();c.translate((getWidth()-sw*scale)/2,(getHeight()-sh*scale)/2);c.scale(scale,scale);if(three)draw3(c);else draw2(c);c.restore();p.setColor(muted);p.setTextSize(18);c.drawText(run?(three?"CHẠY THỬ 3D":"CHẠY THỬ 2D"):(three?"3D VIEW":"2D SCENE"),12,24,p);if(run){p.setColor(Color.WHITE);p.setTextSize(20);String extraHud="";if(runtimeVars.containsKey("Gold"))extraHud+="   Gold: "+(int)Math.round(runtimeVars.getOrDefault("Gold",0d));if(runtimeVars.containsKey("Level"))extraHud+="   Level: "+(int)Math.round(runtimeVars.getOrDefault("Level",1d));c.drawText("Score: "+runtimeScore+"   Lives: "+runtimeLives+(findPlayer()!=null?"   HP: "+(int)Math.round(runtimeObjectHealthValue(findPlayer())):"")+extraHud,12,52,p);if(runtimeGameOver){p.setColor(Color.RED);p.setTextSize(38);c.drawText("GAME OVER",Math.max(12,getWidth()/2f-105),getHeight()/2f,p);}postInvalidateDelayed(40);}}
+        void draw2(Canvas c){int sw=sceneWidth(),sh=sceneHeight();p.setColor(sceneBackgroundColor());c.drawRect(0,0,sw,sh,p);p.setColor(Color.argb(70,255,255,255));int grid=Math.max(10,Math.min(80,snapGridSize));for(int x=0;x<=sw;x+=grid)c.drawLine(x,0,x,sh,p);for(int y=0;y<=sh;y+=grid)c.drawLine(0,y,sw,y,p);JSONArray a=run?runtimeSceneObjects():objects();for(int i=0;i<a.length();i++){JSONObject o=a.optJSONObject(i);if(o==null||(run&&(hiddenRuntimeObjects.contains(o.optString("name"))||destroyedRuntimeObjects.contains(o.optString("name")))))continue;float x=(float)(run?runtimeObjectCoordinate(o,true):o.optDouble("x")),y=(float)(run?runtimeObjectCoordinate(o,false):o.optDouble("y")),w=(float)o.optDouble("w"),h=(float)o.optDouble("h");String type=o.optString("type");p.setColor(o.optInt("color",Color.WHITE));Bitmap sprite=loadSprite(o.optString("image",""));if(sprite!=null)c.drawBitmap(sprite,null,new RectF(x,y,x+Math.max(1,w),y+Math.max(1,h)),p);else if(type.equals("coin")||type.equals("projectile"))c.drawCircle(x+w/2,y+h/2,Math.max(w,h)/2,p);else if(type.equals("platform")){c.drawRect(x,y,x+Math.max(40,w),y+Math.max(20,h),p);p.setColor(Color.rgb(117,73,45));c.drawRect(x,y+h*.6f,x+Math.max(40,w),y+Math.max(20,h),p);}else if(type.equals("camera")||type.equals("light")){p.setTextSize(25);c.drawText(type.equals("camera")?"CAM":"LGT",x+8,y+32,p);}else{c.drawRoundRect(x,y,x+Math.max(34,w),y+Math.max(34,h),8,8,p);p.setColor(Color.WHITE);p.setTextSize(13);c.drawText(o.optString("name"),x,y-4,p);}if(run&&(type.equals("enemy")||type.equals("player")))drawRuntimeHealthBar(c,o,x,y,Math.max(34,w));if(!run&&i==selected){p.setColor(Color.WHITE);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(3);c.drawRect(x-4,y-4,x+Math.max(34,w)+4,y+Math.max(34,h)+4,p);p.setStyle(Paint.Style.FILL);}}}
         void drawRuntimeHealthBar(Canvas c,JSONObject o,float x,float y,float w){double max=Math.max(1,o.optDouble("health",100)),hp=Math.max(0,Math.min(max,runtimeObjectHealthValue(o)));float top=y-9;p.setColor(Color.rgb(60,30,36));c.drawRect(x,top,x+w,top+5,p);p.setColor(hp/max>.35?Color.rgb(45,210,90):Color.rgb(245,75,70));c.drawRect(x,top,x+(float)(w*hp/max),top+5,p);}
-     void draw3(Canvas c){p.setColor(Color.rgb(34,51,73));c.drawRect(0,0,960,540,p);p.setColor(Color.rgb(65,87,111));for(int i=-800;i<1600;i+=50){c.drawLine(480+i,0,480+i*.45f,540,p);c.drawLine(0,270+i*.24f,960,270+i*.24f,p);}JSONArray a=run?runtimeSceneObjects():objects();for(int i=0;i<a.length();i++){JSONObject o=a.optJSONObject(i);if(o==null||(run&&(hiddenRuntimeObjects.contains(o.optString("name"))||destroyedRuntimeObjects.contains(o.optString("name")))))continue;String type=o.optString("type");p.setColor(o.optInt("color",Color.BLUE));if(type.equals("camera")||type.equals("light")){p.setTextSize(22);c.drawText(type.equals("camera")?"◉ Camera":"☼ Light",35+i*20,55+i*24,p);continue;}float x=(float)(run?runtimeObjectCoordinate(o,true):o.optDouble("x")),y=(float)(run?runtimeObjectCoordinate(o,false):o.optDouble("y")),s=Math.max(30,(float)o.optDouble("w",60));x=480+(x-480)*.72f-(y-270)*.35f;y=280+(y-270)*.48f+(x-480)*.18f;Path path=new Path();path.moveTo(x,y-s);path.lineTo(x+s/2,y-s+s/3);path.lineTo(x,y-s+2*s/3);path.lineTo(x-s/2,y-s+s/3);path.close();p.setColor(o.optInt("color",Color.BLUE));c.drawPath(path,p);p.setColor(Color.rgb(35,74,138));c.drawRect(x-s/2,y-s+s/3,x,y+s/3,p);p.setColor(Color.rgb(27,57,111));c.drawRect(x,y-s+2*s/3,x+s/2,y+s/3,p);if(run&&(type.equals("enemy")||type.equals("player")))drawRuntimeHealthBar(c,o,x-s/2,y-s,s);}}
+     void draw3(Canvas c){int sw=sceneWidth(),sh=sceneHeight();p.setColor(sceneBackgroundColor());c.drawRect(0,0,sw,sh,p);p.setColor(Color.argb(95,255,255,255));for(int i=-sw;i<sw*2;i+=50){c.drawLine(sw/2f+i,0,sw/2f+i*.45f,sh,p);c.drawLine(0,sh/2f+i*.24f,sw,sh/2f+i*.24f,p);}JSONArray a=run?runtimeSceneObjects():objects();for(int i=0;i<a.length();i++){JSONObject o=a.optJSONObject(i);if(o==null||(run&&(hiddenRuntimeObjects.contains(o.optString("name"))||destroyedRuntimeObjects.contains(o.optString("name")))))continue;String type=o.optString("type");p.setColor(o.optInt("color",Color.BLUE));if(type.equals("camera")||type.equals("light")){p.setTextSize(22);c.drawText(type.equals("camera")?"◉ Camera":"☼ Light",35+i*20,55+i*24,p);continue;}float x=(float)(run?runtimeObjectCoordinate(o,true):o.optDouble("x")),y=(float)(run?runtimeObjectCoordinate(o,false):o.optDouble("y")),s=Math.max(30,(float)o.optDouble("w",60));float rawX=x,rawY=y;x=sw/2f+(rawX-sw/2f)*.72f-(rawY-sh/2f)*.35f;y=sh/2f+10+(rawY-sh/2f)*.48f+(x-sw/2f)*.18f;Path path=new Path();path.moveTo(x,y-s);path.lineTo(x+s/2,y-s+s/3);path.lineTo(x,y-s+2*s/3);path.lineTo(x-s/2,y-s+s/3);path.close();p.setColor(o.optInt("color",Color.BLUE));c.drawPath(path,p);p.setColor(Color.rgb(35,74,138));c.drawRect(x-s/2,y-s+s/3,x,y+s/3,p);p.setColor(Color.rgb(27,57,111));c.drawRect(x,y-s+2*s/3,x+s/2,y+s/3,p);if(run&&(type.equals("enemy")||type.equals("player")))drawRuntimeHealthBar(c,o,x-s/2,y-s,s);}}
         @Override public boolean onTouchEvent(android.view.MotionEvent e){
-            float scale=Math.min(getWidth()/960f,getHeight()/540f);
+            float scale=Math.min(getWidth()/(float)sceneWidth(),getHeight()/(float)sceneHeight());
             if(scale<=0)return true;
             if(e.getAction()==MotionEvent.ACTION_DOWN){
                 dx=e.getX();dy=e.getY();
                 if(run){jumpRequested=true;invalidate();return true;}
                 JSONArray a=objects();
-                float offsetX=(getWidth()-960*scale)/2f,offsetY=(getHeight()-540*scale)/2f;
+                float offsetX=(getWidth()-sceneWidth()*scale)/2f,offsetY=(getHeight()-sceneHeight()*scale)/2f;
                 double sceneX=(dx-offsetX)/scale,sceneY=(dy-offsetY)/scale;
                 int hit=-1;
                 // Later objects are drawn on top, so test them first.
@@ -963,8 +1007,8 @@ public class MainActivity extends Activity {
                     double width=Math.max(1,o.optDouble("w",1)),height=Math.max(1,o.optDouble("h",1));
                     double nx=snapCoordinate(sx+(e.getX()-dx)/scale);
                     double ny=snapCoordinate(sy+(e.getY()-dy)/scale);
-                    o.put("x",Math.max(0,Math.min(Math.max(0,960-width),nx)));
-                    o.put("y",Math.max(0,Math.min(Math.max(0,540-height),ny)));
+                    o.put("x",Math.max(0,Math.min(Math.max(0,sceneWidth()-width),nx)));
+                    o.put("y",Math.max(0,Math.min(Math.max(0,sceneHeight()-height),ny)));
                 }catch(Exception ignored){}
                 invalidate();return true;
             }
