@@ -389,7 +389,7 @@ public class MainActivity extends Activity {
     Double resolveValue(String token){
         if(token==null)return null;
         String s=token.trim();
-        Double simple=resolveSimpleValue(s);if(simple!=null)return simple;
+        Double simple=resolveSimpleValue(s);if(simple!=null)return finiteNumber(simple)?simple:null;
         try{ExpressionParser parser=new ExpressionParser(s);double value=parser.expression();parser.spaces();if(parser.pos==s.length()&&finiteNumber(value))return value;}catch(Exception ignored){}
         return null;
     }
@@ -450,6 +450,7 @@ public class MainActivity extends Activity {
         }
     }
     void setRuntimeValue(String key,double value){
+        if(!finiteNumber(value))return;
         Matcher objectCoordinate=Pattern.compile("(?i)^([A-Za-z_][A-Za-z0-9_]*)\.(X|Y|VX|VY|Health)$").matcher(key);
         if(objectCoordinate.matches()){
             String target=resolveLastHitTarget(objectCoordinate.group(1));
