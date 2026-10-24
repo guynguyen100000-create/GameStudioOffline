@@ -509,6 +509,44 @@ public class MainActivity extends Activity {
     JSONObject read(File f)throws Exception{ByteArrayOutputStream b=new ByteArrayOutputStream();try(InputStream in=new FileInputStream(f)){byte[] buf=new byte[4096];int n;while((n=in.read(buf))>0)b.write(buf,0,n);}return new JSONObject(b.toString("UTF-8"));}
     void open(File f){try{project=read(f);activeFile=f;tab=project.optString("dimension","2D");preview=false;selected=0;editor();}catch(Exception e){toast("Không mở được dự án");}}
     void save(){try(FileOutputStream out=new FileOutputStream(activeFile)){out.write(project.toString(2).getBytes(StandardCharsets.UTF_8));}catch(Exception e){toast("Lỗi lưu");}}
+    void validateProject(){
+        ArrayList<String> errors=new ArrayList<>(),warnings=new ArrayList<>();
+        if(project==null){toast("Chưa mở dự án");return;}
+        String projectName=project.optString("name","").trim();
+        if(projectName.isEmpty())errors.add("• Dự án chưa có tên.");
+        int width=project.optInt("width",0),height=project.optInt("height",0);
+        if(width<=0||height<=0)errors.add("• Kích thước cảnh phải lớn hơn 0.");
+        JSONArray os=objects();HashSet<String> names=new HashSet<>();boolean hasPlayer=false;
+        for(int i=0;i<os.length();i++){
+            JSONObject o=os.optJSONObject(i);if(o==null){errors.add("• Đối tượng thứ "+(i+1)+" không hợp lệ.");continue;}
+            String name=o.optString("name","").trim();
+            if(name.isEmpty())errors.add("• Đối tượng thứ "+(i+1)+" chưa có tên.");
+            else if(!names.add(name.toLowerCase(Locale.ROOT)))errors.add("• Tên đối tượng bị trùng: "+name+" (các lệnh sẽ khó xác định đúng đối tượng).");
+            if(isPlayerObject(o))hasPlayer=true;
+            if(o.optDouble("w",0)<0||o.optDouble("h",0)<0)errors.add("• Kích thước của "+(name.isEmpty()?"đối tượng "+(i+1):name)+" không được âm.");
+        }
+        if(!hasPlayer)warnings.add("• Chưa có Player; các sự kiện điều khiển nhân vật sẽ không hoạt động.");
+        JSONArray vars=project.optJSONArray("variables");HashSet<String> varNames=new HashSet<>();
+        if(vars!=null)for(int i=0;i<vars.length();i++){
+            JSONObject v=vars.optJSONObject(i);if(v==null){errors.add("• Biến thứ "+(i+1)+" không hợp lệ.");continue;}
+            String name=v.optString("name","").trim();
+            if(!name.matches("[A-Za-z_][A-Za-z0-9_]*"))errors.add("• Tên biến không hợp lệ: "+(name.isEmpty()?"(trống)":name)+".");
+            else if(!varNames.add(name.toLowerCase(Locale.ROOT)))errors.add("• Tên biến bị trùng: "+name+".");
+        }
+        JSONArray events=project.optJSONArray("events");
+        if(events!=null)for(int i=0;i<events.length();i++){
+            JSONObject e=events.optJSONObject(i);if(e==null){errors.add("• Khối sự kiện thứ "+(i+1)+" không hợp lệ.");continue;}
+            if(e.optString("trigger","").trim().isEmpty())errors.add("• Khối sự kiện "+(i+1)+" thiếu điều kiện kích hoạt.");
+            if(e.optString("action","").trim().isEmpty()&&e.optString("customAction","").trim().isEmpty())warnings.add("• Khối sự kiện "+(i+1)+" chưa có hành động.");
+        }
+        StringBuilder report=new StringBuilder();
+        if(errors.isEmpty())report.append("✓ Không tìm thấy lỗi cấu trúc cơ bản.\\n");
+        else{report.append("LỖI CẦN SỬA (").append(errors.size()).append("):\\n");for(String e:errors)report.append(e).append("\\n");}
+        if(!warnings.isEmpty()){report.append("\\nLƯU Ý (").append(warnings.size()).append("):\\n");for(String w:warnings)report.append(w).append("\\n");}
+        report.append("\\nKiểm tra này rà soát cấu trúc dự án, không thay thế việc chạy thử game trên thiết bị.");
+        new AlertDialog.Builder(this).setTitle(errors.isEmpty()?"Kiểm tra dự án":"Phát hiện vấn đề").setMessage(report.toString()).setPositiveButton("Đóng",null).show();
+    }
+
     JSONArray objects(){JSONArray a=project.optJSONArray("objects");if(a==null){a=new JSONArray();try{project.put("objects",a);}catch(Exception ignored){}}return a;}
     void add(String n,String type,int color){try{JSONArray a=objects();a.put(obj(n+" "+(a.length()+1),type,220+(a.length()*47)%540,180+(a.length()*31)%230,type.equals("coin")?30:54,type.equals("coin")?30:54,color));selected=a.length()-1;save();editor();}catch(Exception ignored){}}
 
@@ -517,7 +555,7 @@ public class MainActivity extends Activity {
         top.addView(label(project.optString("name","Game"),16,fg,true),new LinearLayout.LayoutParams(0,-2,1));
         top.addView(btn("Lưu",()->{save();toast("Đã lưu ngoại tuyến");}));
         top.addView(btn(preview?"Dừng":"Chạy",()->{if(!preview)startRuntime();else stopRuntime();preview=!preview;editor();}));root.addView(top);
-        LinearLayout tabs=row();for(String t:new String[]{"2D","3D","Đối tượng","Sự kiện","Biến"})tabs.addView(btn(t,()->{tab=t;editor();}));root.addView(scroll(tabs));
+        LinearLayout tabs=row();for(String t:new String[]{"2D","3D","Đối tượng","Sự kiện","Biến"})tabs.addView(btn(t,()->{tab=t;editor();}));root.addView(scroll(tabs));\n        root.addView(btn("✓ Kiểm tra dự án",this::validateProject));
         if(preview){
             boolean preview3D=project.optString("dimension","2D").equals("3D");
             root.addView(label("CHẠY THỬ • Sự kiện đang được thực thi",12,Color.GREEN,true));
