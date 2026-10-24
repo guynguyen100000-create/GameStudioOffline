@@ -111,7 +111,7 @@ public class MainActivity extends Activity {
     }
     int selected=0;
     final String[] triggerChoices={"Khi bắt đầu cảnh","Mỗi khung hình","Mỗi 1 giây","Mỗi 5 giây","Mỗi 10 giây","Khi Player chạm Coin","Khi Player chạm Enemy","Khi Player chạm Cube","Khi Player chạm Platform","Khi Player chạm bất kỳ đối tượng nào","Khi bấm nút Nhảy","Khi bấm nút Bắn","Khi điều kiện chuyển thành đúng","Trong khi điều kiện đúng","Khi Player rơi khỏi màn hình"};
-    final String[] actionChoices={"Đặt biến Score = 0","Tăng Score thêm 1","Tăng Score thêm 10","Giảm Score đi 1","Đặt biến Lives = 3","Tăng Lives thêm 1","Ẩn Coin","Hiện Coin","Ẩn Enemy","Hiện Enemy","Cho Player nhảy","Trừ 1 mạng","Di chuyển Player","Di chuyển Player sang trái","Di chuyển Player sang phải","Hồi sinh Player","Đặt Gravity = 950","Đặt MoveSpeed = 240","Đặt JumpStrength = 430","Cho Enemy tự đi sang phải","Cho Enemy tự đi sang trái","Dừng Enemy","Cho Enemy đuổi theo Player","Dừng Enemy đuổi theo Player","Bắn Projectile","Trừ 25 máu Enemy","Hồi 25 máu Player","Đưa Player về điểm xuất phát","Lệnh tùy chỉnh (xem ô bên dưới)"};
+    final String[] actionChoices={"Đặt biến Score = 0","Tăng Score thêm 1","Tăng Score thêm 10","Giảm Score đi 1","Đặt biến Lives = 3","Tăng Lives thêm 1","Ẩn Coin","Hiện Coin","Ẩn Enemy","Hiện Enemy","Cho Player nhảy","Trừ 1 mạng","Di chuyển Player","Di chuyển Player sang trái","Di chuyển Player sang phải","Hồi sinh Player","Đặt Gravity = 950","Đặt MoveSpeed = 240","Đặt JumpStrength = 430","Cho Enemy tự đi sang phải","Cho Enemy tự đi sang trái","Dừng Enemy","Cho Enemy đuổi theo Player","Dừng Enemy đuổi theo Player","Bắn Projectile","Trừ 10 máu Player","Trừ 25 máu Enemy","Hồi 25 máu Player","Đưa Player về điểm xuất phát","Lệnh tùy chỉnh (xem ô bên dưới)"};
     // Runtime state is separate from editor data; play-testing never changes saved object positions.
     final Map<String,Double> runtimeVars = new HashMap<>();
     final Map<String,Double> runtimeObjectX = new HashMap<>();
@@ -390,6 +390,7 @@ public class MainActivity extends Activity {
         if(low.contains("cho enemy tự đi sang phải"))setObjectVelocity("Enemy",true,120);
         if(low.contains("cho enemy tự đi sang trái"))setObjectVelocity("Enemy",true,-120);
         if(low.contains("dừng enemy")){setObjectVelocity("Enemy",true,0);setObjectVelocity("Enemy",false,0);}
+        if(low.contains("trừ 10 máu player")){JSONObject player=findPlayer();if(player!=null)setObjectHealth(player.optString("name","Player"),Math.max(0,runtimeObjectHealthValue(player)-10));}
         if(low.contains("trừ 25 máu enemy")){JSONObject enemy=findObject("Enemy");if(enemy!=null)setObjectHealth(enemy.optString("name","Enemy"),Math.max(0,runtimeObjectHealthValue(enemy)-25));}
         if(low.contains("hồi 25 máu player")){JSONObject p=findPlayer();if(p!=null)setObjectHealth(p.optString("name","Player"),runtimeObjectHealthValue(p)+25);}
         if(low.contains("đưa player về điểm xuất phát")){runtimePlayerX=runtimeSpawnX;runtimePlayerY=runtimeSpawnY;runtimePlayerVY=0;runtimeGrounded=false;}
