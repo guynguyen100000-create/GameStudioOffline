@@ -119,6 +119,8 @@ public class MainActivity extends Activity {
     final Map<String,Double> runtimeObjectVX = new HashMap<>();
     final Map<String,Double> runtimeObjectVY = new HashMap<>();
     final Map<String,Double> runtimeObjectHealth = new HashMap<>();
+    final ArrayList<JSONObject> runtimeSpawnedObjects = new ArrayList<>();
+    int runtimeSpawnCounter=0;
     final Set<String> hiddenRuntimeObjects = new HashSet<>();
     final Set<String> destroyedRuntimeObjects = new HashSet<>();
     final Set<String> previousContacts = new HashSet<>();
@@ -136,7 +138,7 @@ public class MainActivity extends Activity {
         runtimeVars.clear();runtimeVars.put("Score",0d);runtimeVars.put("Lives",3d);runtimeVars.put("Timer",0d);
         JSONArray savedVars=project.optJSONArray("variables");
         if(savedVars!=null)for(int i=0;i<savedVars.length();i++){JSONObject v=savedVars.optJSONObject(i);if(v!=null){String n=v.optString("name","").trim();if(!n.isEmpty())putRuntimeVar(n,v.optDouble("value",0));}}
-        runtimeObjectX.clear();runtimeObjectY.clear();runtimeObjectVX.clear();runtimeObjectVY.clear();runtimeObjectHealth.clear();JSONArray sceneObjects=objects();for(int i=0;i<sceneObjects.length();i++){JSONObject o=sceneObjects.optJSONObject(i);if(o!=null){String n=o.optString("name","");runtimeObjectX.put(n,o.optDouble("x",0));runtimeObjectY.put(n,o.optDouble("y",0));runtimeObjectVX.put(n,o.optDouble("vx",0));runtimeObjectVY.put(n,o.optDouble("vy",0));runtimeObjectHealth.put(n,o.optDouble("health",100));}}
+        runtimeSpawnedObjects.clear();runtimeSpawnCounter=0;runtimeObjectX.clear();runtimeObjectY.clear();runtimeObjectVX.clear();runtimeObjectVY.clear();runtimeObjectHealth.clear();JSONArray sceneObjects=objects();for(int i=0;i<sceneObjects.length();i++){JSONObject o=sceneObjects.optJSONObject(i);if(o!=null){String n=o.optString("name","");runtimeObjectX.put(n,o.optDouble("x",0));runtimeObjectY.put(n,o.optDouble("y",0));runtimeObjectVX.put(n,o.optDouble("vx",0));runtimeObjectVY.put(n,o.optDouble("vy",0));runtimeObjectHealth.put(n,o.optDouble("health",100));}}
         hiddenRuntimeObjects.clear();destroyedRuntimeObjects.clear();previousContacts.clear();eventTimerLastFired.clear();eventConditionWasTrue.clear();
         runtimeScore=0;runtimeLives=3;runtimeGravity=950;runtimeMoveSpeed=240;runtimeJumpStrength=430;runtimeTimeScale=1;
         runtimePlayerVX=0;runtimePlayerVY=0;moveAxis=0;jumpRequested=false;runtimeGrounded=false;
@@ -145,12 +147,23 @@ public class MainActivity extends Activity {
         lastRuntimeTick=System.currentTimeMillis();runtimeStartMillis=lastRuntimeTick;runtimeStarted=true;
         executePhase("start",null);
     }
-    void stopRuntime(){runtimeStarted=false;moveAxis=0;jumpRequested=false;hiddenRuntimeObjects.clear();destroyedRuntimeObjects.clear();previousContacts.clear();runtimeObjectX.clear();runtimeObjectY.clear();runtimeObjectVX.clear();runtimeObjectVY.clear();runtimeObjectHealth.clear();}
+    void stopRuntime(){runtimeStarted=false;moveAxis=0;jumpRequested=false;hiddenRuntimeObjects.clear();destroyedRuntimeObjects.clear();previousContacts.clear();runtimeSpawnedObjects.clear();runtimeSpawnCounter=0;runtimeObjectX.clear();runtimeObjectY.clear();runtimeObjectVX.clear();runtimeObjectVY.clear();runtimeObjectHealth.clear();}
+    JSONArray runtimeSceneObjects(){JSONArray all=new JSONArray();JSONArray base=objects();for(int i=0;i<base.length();i++){JSONObject o=base.optJSONObject(i);if(o!=null)all.put(o);}for(JSONObject o:runtimeSpawnedObjects)if(o!=null)all.put(o);return all;}
     JSONObject findObject(String query){
         if(query==null)return null;String q=query.trim();JSONArray a=objects();
         for(int i=0;i<a.length();i++){JSONObject o=a.optJSONObject(i);if(o!=null&&o.optString("name","").equalsIgnoreCase(q))return o;}
+        for(JSONObject o:runtimeSpawnedObjects)if(o!=null&&o.optString("name","").equalsIgnoreCase(q))return o;
         for(int i=0;i<a.length();i++){JSONObject o=a.optJSONObject(i);if(o!=null&&o.optString("type","").equalsIgnoreCase(q))return o;}
+        for(JSONObject o:runtimeSpawnedObjects)if(o!=null&&o.optString("type","").equalsIgnoreCase(q))return o;
         return null;
+    }
+    void spawnRuntimeObject(String templateQuery,double x,double y,double vx,double vy){
+        JSONObject template=null;JSONArray base=objects();String q=templateQuery.trim();
+        for(int i=0;i<base.length();i++){JSONObject o=base.optJSONObject(i);if(o!=null&&o.optString("name","").equalsIgnoreCase(q)){template=o;break;}}
+        if(template==null)for(int i=0;i<base.length();i++){JSONObject o=base.optJSONObject(i);if(o!=null&&o.optString("type","").equalsIgnoreCase(q)){template=o;break;}}
+        if(template==null||isPlayerObject(template)){toast("Không tìm thấy mẫu phù hợp để tạo: "+q);return;}
+        try{JSONObject instance=new JSONObject(template.toString());String baseName=template.optString("name",q).replaceAll("\\s+","_");String instanceName="Spawned_"+baseName+"_"+(++runtimeSpawnCounter);instance.put("name",instanceName);instance.put("x",x);instance.put("y",y);instance.put("vx",Double.isNaN(vx)?template.optDouble("vx",0):vx);instance.put("vy",Double.isNaN(vy)?template.optDouble("vy",0):vy);runtimeSpawnedObjects.add(instance);runtimeObjectX.put(instanceName,x);runtimeObjectY.put(instanceName,y);runtimeObjectVX.put(instanceName,instance.optDouble("vx",0));runtimeObjectVY.put(instanceName,instance.optDouble("vy",0));runtimeObjectHealth.put(instanceName,instance.optDouble("health",100));}
+        catch(Exception e){toast("Không tạo được đối tượng runtime");}
     }
     boolean isPlayerObject(JSONObject o){return o!=null&&(o.optString("type","").equalsIgnoreCase("player")||o.optString("name","").equalsIgnoreCase("player"));}
     double runtimeObjectCoordinate(JSONObject o,boolean xAxis){
@@ -295,13 +308,13 @@ public class MainActivity extends Activity {
         runtimeLives=(int)Math.round(runtimeVars.getOrDefault("Lives",3d));
     }
     void hideMatchingObjects(String query,boolean hidden){
-        String q=query.trim().toLowerCase(Locale.ROOT);JSONArray a=objects();
+        String q=query.trim().toLowerCase(Locale.ROOT);JSONArray a=runtimeSceneObjects();
         for(int i=0;i<a.length();i++){JSONObject o=a.optJSONObject(i);if(o==null)continue;String name=o.optString("name","").toLowerCase(Locale.ROOT),type=o.optString("type","").toLowerCase(Locale.ROOT);
             if(name.equals(q)||type.equals(q)||name.contains(q)){if(hidden)hiddenRuntimeObjects.add(o.optString("name",""));else hiddenRuntimeObjects.remove(o.optString("name",""));}
         }
     }
     void destroyMatchingObjects(String query){
-        String q=query.trim().toLowerCase(Locale.ROOT);JSONArray a=objects();
+        String q=query.trim().toLowerCase(Locale.ROOT);JSONArray a=runtimeSceneObjects();
         for(int i=0;i<a.length();i++){JSONObject o=a.optJSONObject(i);if(o==null)continue;String name=o.optString("name","").toLowerCase(Locale.ROOT),type=o.optString("type","").toLowerCase(Locale.ROOT);
             if(name.equals(q)||type.equals(q)||name.contains(q))destroyedRuntimeObjects.add(o.optString("name",""));
         }
@@ -313,6 +326,8 @@ public class MainActivity extends Activity {
         Matcher customAdd=Pattern.compile("(?i)^add\\s+([A-Za-z_][A-Za-z0-9_]*)\\s+(.+)$").matcher(command);
         Matcher customSub=Pattern.compile("(?i)^subtract\\s+([A-Za-z_][A-Za-z0-9_]*)\\s+(.+)$").matcher(command);
         Matcher teleport=Pattern.compile("(?i)^teleport\\s+([A-Za-z_][A-Za-z0-9_]*)\\s+(-?\\d+(?:\\.\\d+)?)\\s+(-?\\d+(?:\\.\\d+)?)$").matcher(command);
+        Matcher spawnAtPlayer=Pattern.compile("(?i)^spawn\\s+([A-Za-z_][A-Za-z0-9_]*)\\s+at\\s+player(?:\\s+(-?\\d+(?:\\.\\d+)?)\\s+(-?\\d+(?:\\.\\d+)?))?$").matcher(command);
+        Matcher spawn=Pattern.compile("(?i)^spawn\\s+([A-Za-z_][A-Za-z0-9_]*)\\s+(-?\\d+(?:\\.\\d+)?)\\s+(-?\\d+(?:\\.\\d+)?)(?:\\s+(-?\\d+(?:\\.\\d+)?)\\s+(-?\\d+(?:\\.\\d+)?))?$").matcher(command);
         Matcher hide=Pattern.compile("(?i)^(hide|show|destroy)\\s+(.+)$").matcher(command);
         if(customSet.matches()){
             String key=customSet.group(1);Double calculated=resolveValue(customSet.group(2));if(calculated==null)return;double value=calculated;
@@ -333,6 +348,8 @@ public class MainActivity extends Activity {
             putRuntimeVar(key,resolveValue(key)==null?0:resolveValue(key)+(m==customAdd?value:-value));updateHudValues();return;
         }
         if(teleport.matches()){teleportObject(teleport.group(1),Double.parseDouble(teleport.group(2)),Double.parseDouble(teleport.group(3)));updateHudValues();return;}
+        if(spawnAtPlayer.matches()){double vx=spawnAtPlayer.group(2)==null?Double.NaN:Double.parseDouble(spawnAtPlayer.group(2));double vy=spawnAtPlayer.group(3)==null?Double.NaN:Double.parseDouble(spawnAtPlayer.group(3));spawnRuntimeObject(spawnAtPlayer.group(1),runtimePlayerX,runtimePlayerY,vx,vy);updateHudValues();return;}
+        if(spawn.matches()){double vx=spawn.group(4)==null?Double.NaN:Double.parseDouble(spawn.group(4));double vy=spawn.group(5)==null?Double.NaN:Double.parseDouble(spawn.group(5));spawnRuntimeObject(spawn.group(1),Double.parseDouble(spawn.group(2)),Double.parseDouble(spawn.group(3)),vx,vy);updateHudValues();return;}
         if(hide.matches()){String verb=hide.group(1).toLowerCase(Locale.ROOT),target=hide.group(2);if(verb.equals("destroy"))destroyMatchingObjects(target);else hideMatchingObjects(target,verb.equals("hide"));updateHudValues();return;}
         if(command.equalsIgnoreCase("respawn Player")||command.equalsIgnoreCase("respawn player")){runtimePlayerX=runtimeSpawnX;runtimePlayerY=runtimeSpawnY;runtimePlayerVY=0;runtimeGrounded=false;updateHudValues();return;}
         Matcher set=Pattern.compile("(?i).*đặt(?:\\s+biến)?\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*([A-Za-z0-9_ .+*/()%\\-]+).*").matcher(action);
@@ -361,7 +378,7 @@ public class MainActivity extends Activity {
         updateHudValues();
     }
     void setCoinsHidden(boolean hidden){
-        JSONArray a=objects();for(int i=0;i<a.length();i++){JSONObject o=a.optJSONObject(i);if(o!=null&&o.optString("type").equalsIgnoreCase("coin")){if(hidden)hiddenRuntimeObjects.add(o.optString("name"));else hiddenRuntimeObjects.remove(o.optString("name"));}}
+        JSONArray a=runtimeSceneObjects();for(int i=0;i<a.length();i++){JSONObject o=a.optJSONObject(i);if(o!=null&&o.optString("type").equalsIgnoreCase("coin")){if(hidden)hiddenRuntimeObjects.add(o.optString("name"));else hiddenRuntimeObjects.remove(o.optString("name"));}}
     }
     void tickRuntime(){
         if(!runtimeStarted)startRuntime();
@@ -376,7 +393,7 @@ public class MainActivity extends Activity {
         runtimePlayerVY=Math.min(1200,runtimePlayerVY+runtimeGravity*dt);
         runtimePlayerY=Math.max(0,runtimePlayerY+runtimePlayerVY*dt);
         runtimeGrounded=false;
-        JSONArray all=objects();Set<String> currentContacts=new HashSet<>();
+        JSONArray all=runtimeSceneObjects();Set<String> currentContacts=new HashSet<>();
         for(int i=0;i<all.length();i++){
             JSONObject o=all.optJSONObject(i);if(o==null||o==player)continue;
             String type=o.optString("type","").toLowerCase(Locale.ROOT),name=o.optString("name","Object");
@@ -385,8 +402,8 @@ public class MainActivity extends Activity {
             double ox=runtimeObjectCoordinate(o,true),oy=runtimeObjectCoordinate(o,false),ow=Math.max(1,o.optDouble("w")),oh=Math.max(1,o.optDouble("h"));
             boolean overlap=runtimePlayerX<ox+ow&&runtimePlayerX+pw>ox&&runtimePlayerY<oy+oh&&runtimePlayerY+ph>oy;
             boolean landedOnThisPlatform=type.equals("platform")&&runtimePlayerVY>=0&&oldBottom<=oy+12&&runtimePlayerY+ph>=oy&&runtimePlayerX+pw>ox&&runtimePlayerX<ox+ow;
-            if(landedOnThisPlatform){runtimePlayerY=oy-ph;runtimePlayerVY=0;runtimeGrounded=true;String key="platform:"+name;currentContacts.add(key);if(!previousContacts.contains(key))executePhase("collision","platform");}
-            if(overlap&&(type.equals("coin")||type.equals("enemy")||type.equals("cube"))){String key=type+":"+name;currentContacts.add(key);if(!previousContacts.contains(key))executePhase("collision",type);}
+            if(landedOnThisPlatform){runtimePlayerY=oy-ph;runtimePlayerVY=0;runtimeGrounded=true;}
+            if(overlap&&!type.equals("camera")&&!type.equals("light")&&!type.equals("player")){String key=type+":"+name;currentContacts.add(key);if(!previousContacts.contains(key))executePhase("collision",type);}
         }
         if(runtimePlayerY+ph>=500){runtimePlayerY=500-ph;runtimePlayerVY=0;runtimeGrounded=true;}
         previousContacts.clear();previousContacts.addAll(currentContacts);
@@ -520,7 +537,7 @@ public class MainActivity extends Activity {
         }
         root.addView(btn("+ Thêm sự kiện",()->editEvent(-1)));
         root.addView(label("Điều kiện hỗ trợ: Score >= 10, Lives <= 0, Timer > 5, Player.X >= 300; kết hợp &&, ||, ! và dấu ngoặc. Chọn 'Khi điều kiện chuyển thành đúng' để chạy một lần khi điều kiện vừa đúng.",12,muted,false));
-        root.addView(label("Lệnh tùy chỉnh: set Enemy.VX = 80; set Enemy.VY = 0; set Player.VX = 100; set Enemy.X = Player.X + 80; set Coin.Y = Coin.Y - 3; teleport Enemy 400 200; set Enemy.Health = Enemy.Health - 25; destroy Enemy. VX/VY là vận tốc X/Y và duy trì mỗi khung hình; mặc định 0. Máu mặc định 100. Tên đối tượng trong các lệnh phải viết liền, không dấu cách. Các lệnh khác: set Score = 10; add Score 5; subtract Lives 1; set Gravity = 800; set MoveSpeed = 300; set JumpStrength = 500; set TimeScale = 0.5; hide Coin; show Enemy; respawn Player.",12,muted,false));
+        root.addView(label("Lệnh tùy chỉnh: spawn Bullet at Player 260 0 (tạo bản sao Bullet tại Player, vận tốc X=260/Y=0); spawn Coin 300 200; set Enemy.VX = 80; set Enemy.VY = 0; set Player.VX = 100; set Enemy.X = Player.X + 80; teleport Enemy 400 200; set Enemy.Health = Enemy.Health - 25; destroy Enemy. Spawn chỉ tồn tại trong lúc chơi thử, không sửa dự án gốc. VX/VY là vận tốc X/Y theo giây. Tên mẫu dùng trong lệnh spawn nên viết liền, không dấu cách. Các lệnh khác: set Score = 10; add Score 5; subtract Lives 1; set Gravity = 800; set MoveSpeed = 300; set JumpStrength = 500; set TimeScale = 0.5; hide Coin; show Enemy; respawn Player.",12,muted,false));
     }
     void editEvent(int index){
         JSONArray existingEvents=project.optJSONArray("events");
@@ -565,8 +582,8 @@ public class MainActivity extends Activity {
         Paint p=new Paint(3);boolean run,three;float dx,dy;double sx,sy;boolean drag;
         SceneView(boolean r,boolean d){super(MainActivity.this);run=r;three=d;setBackgroundColor(bg);}
         @Override protected void onDraw(Canvas c){super.onDraw(c);c.drawColor(Color.rgb(20,33,51));if(run)tickRuntime();float scale=Math.min(getWidth()/960f,getHeight()/540f);if(scale<=0)return;c.save();c.translate((getWidth()-960*scale)/2,(getHeight()-540*scale)/2);c.scale(scale,scale);if(three)draw3(c);else draw2(c);c.restore();p.setColor(muted);p.setTextSize(18);c.drawText(run?(three?"CHẠY THỬ 3D":"CHẠY THỬ 2D"):(three?"3D VIEW":"2D SCENE"),12,24,p);if(run){p.setColor(Color.WHITE);p.setTextSize(20);c.drawText("Score: "+runtimeScore+"   Lives: "+runtimeLives+"   HP: "+(int)Math.round(runtimeObjectHealthValue(findPlayer())),12,52,p);postInvalidateDelayed(40);}}
-        void draw2(Canvas c){p.setColor(Color.rgb(100,180,242));c.drawRect(0,0,960,540,p);p.setColor(Color.rgb(129,201,252));for(int x=0;x<=960;x+=40)c.drawLine(x,0,x,540,p);for(int y=0;y<=540;y+=40)c.drawLine(0,y,960,y,p);JSONArray a=objects();for(int i=0;i<a.length();i++){JSONObject o=a.optJSONObject(i);if(o==null||(run&&(hiddenRuntimeObjects.contains(o.optString("name"))||destroyedRuntimeObjects.contains(o.optString("name")))))continue;float x=(float)(run?runtimeObjectCoordinate(o,true):o.optDouble("x")),y=(float)(run?runtimeObjectCoordinate(o,false):o.optDouble("y")),w=(float)o.optDouble("w"),h=(float)o.optDouble("h");String type=o.optString("type");p.setColor(o.optInt("color",Color.WHITE));Bitmap sprite=loadSprite(o.optString("image",""));if(sprite!=null)c.drawBitmap(sprite,null,new RectF(x,y,x+Math.max(1,w),y+Math.max(1,h)),p);else if(type.equals("coin"))c.drawCircle(x+w/2,y+h/2,Math.max(w,h)/2,p);else if(type.equals("platform")){c.drawRect(x,y,x+Math.max(40,w),y+Math.max(20,h),p);p.setColor(Color.rgb(117,73,45));c.drawRect(x,y+h*.6f,x+Math.max(40,w),y+Math.max(20,h),p);}else if(type.equals("camera")||type.equals("light")){p.setTextSize(25);c.drawText(type.equals("camera")?"CAM":"LGT",x+8,y+32,p);}else{c.drawRoundRect(x,y,x+Math.max(34,w),y+Math.max(34,h),8,8,p);p.setColor(Color.WHITE);p.setTextSize(13);c.drawText(o.optString("name"),x,y-4,p);}if(!run&&i==selected){p.setColor(Color.WHITE);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(3);c.drawRect(x-4,y-4,x+Math.max(34,w)+4,y+Math.max(34,h)+4,p);p.setStyle(Paint.Style.FILL);}}}
-        void draw3(Canvas c){p.setColor(Color.rgb(34,51,73));c.drawRect(0,0,960,540,p);p.setColor(Color.rgb(65,87,111));for(int i=-800;i<1600;i+=50){c.drawLine(480+i,0,480+i*.45f,540,p);c.drawLine(0,270+i*.24f,960,270+i*.24f,p);}JSONArray a=objects();for(int i=0;i<a.length();i++){JSONObject o=a.optJSONObject(i);if(o==null||(run&&(hiddenRuntimeObjects.contains(o.optString("name"))||destroyedRuntimeObjects.contains(o.optString("name")))))continue;String type=o.optString("type");p.setColor(o.optInt("color",Color.BLUE));if(type.equals("camera")||type.equals("light")){p.setTextSize(22);c.drawText(type.equals("camera")?"◉ Camera":"☼ Light",35+i*20,55+i*24,p);continue;}float x=(float)(run?runtimeObjectCoordinate(o,true):o.optDouble("x")),y=(float)(run?runtimeObjectCoordinate(o,false):o.optDouble("y")),s=Math.max(30,(float)o.optDouble("w",60));x=480+(x-480)*.72f-(y-270)*.35f;y=280+(y-270)*.48f+(x-480)*.18f;Path path=new Path();path.moveTo(x,y-s);path.lineTo(x+s/2,y-s+s/3);path.lineTo(x,y-s+2*s/3);path.lineTo(x-s/2,y-s+s/3);path.close();p.setColor(o.optInt("color",Color.BLUE));c.drawPath(path,p);p.setColor(Color.rgb(35,74,138));c.drawRect(x-s/2,y-s+s/3,x,y+s/3,p);p.setColor(Color.rgb(27,57,111));c.drawRect(x,y-s+2*s/3,x+s/2,y+s/3,p);}}
+        void draw2(Canvas c){p.setColor(Color.rgb(100,180,242));c.drawRect(0,0,960,540,p);p.setColor(Color.rgb(129,201,252));for(int x=0;x<=960;x+=40)c.drawLine(x,0,x,540,p);for(int y=0;y<=540;y+=40)c.drawLine(0,y,960,y,p);JSONArray a=run?runtimeSceneObjects():objects();for(int i=0;i<a.length();i++){JSONObject o=a.optJSONObject(i);if(o==null||(run&&(hiddenRuntimeObjects.contains(o.optString("name"))||destroyedRuntimeObjects.contains(o.optString("name")))))continue;float x=(float)(run?runtimeObjectCoordinate(o,true):o.optDouble("x")),y=(float)(run?runtimeObjectCoordinate(o,false):o.optDouble("y")),w=(float)o.optDouble("w"),h=(float)o.optDouble("h");String type=o.optString("type");p.setColor(o.optInt("color",Color.WHITE));Bitmap sprite=loadSprite(o.optString("image",""));if(sprite!=null)c.drawBitmap(sprite,null,new RectF(x,y,x+Math.max(1,w),y+Math.max(1,h)),p);else if(type.equals("coin"))c.drawCircle(x+w/2,y+h/2,Math.max(w,h)/2,p);else if(type.equals("platform")){c.drawRect(x,y,x+Math.max(40,w),y+Math.max(20,h),p);p.setColor(Color.rgb(117,73,45));c.drawRect(x,y+h*.6f,x+Math.max(40,w),y+Math.max(20,h),p);}else if(type.equals("camera")||type.equals("light")){p.setTextSize(25);c.drawText(type.equals("camera")?"CAM":"LGT",x+8,y+32,p);}else{c.drawRoundRect(x,y,x+Math.max(34,w),y+Math.max(34,h),8,8,p);p.setColor(Color.WHITE);p.setTextSize(13);c.drawText(o.optString("name"),x,y-4,p);}if(!run&&i==selected){p.setColor(Color.WHITE);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(3);c.drawRect(x-4,y-4,x+Math.max(34,w)+4,y+Math.max(34,h)+4,p);p.setStyle(Paint.Style.FILL);}}}
+        void draw3(Canvas c){p.setColor(Color.rgb(34,51,73));c.drawRect(0,0,960,540,p);p.setColor(Color.rgb(65,87,111));for(int i=-800;i<1600;i+=50){c.drawLine(480+i,0,480+i*.45f,540,p);c.drawLine(0,270+i*.24f,960,270+i*.24f,p);}JSONArray a=run?runtimeSceneObjects():objects();for(int i=0;i<a.length();i++){JSONObject o=a.optJSONObject(i);if(o==null||(run&&(hiddenRuntimeObjects.contains(o.optString("name"))||destroyedRuntimeObjects.contains(o.optString("name")))))continue;String type=o.optString("type");p.setColor(o.optInt("color",Color.BLUE));if(type.equals("camera")||type.equals("light")){p.setTextSize(22);c.drawText(type.equals("camera")?"◉ Camera":"☼ Light",35+i*20,55+i*24,p);continue;}float x=(float)(run?runtimeObjectCoordinate(o,true):o.optDouble("x")),y=(float)(run?runtimeObjectCoordinate(o,false):o.optDouble("y")),s=Math.max(30,(float)o.optDouble("w",60));x=480+(x-480)*.72f-(y-270)*.35f;y=280+(y-270)*.48f+(x-480)*.18f;Path path=new Path();path.moveTo(x,y-s);path.lineTo(x+s/2,y-s+s/3);path.lineTo(x,y-s+2*s/3);path.lineTo(x-s/2,y-s+s/3);path.close();p.setColor(o.optInt("color",Color.BLUE));c.drawPath(path,p);p.setColor(Color.rgb(35,74,138));c.drawRect(x-s/2,y-s+s/3,x,y+s/3,p);p.setColor(Color.rgb(27,57,111));c.drawRect(x,y-s+2*s/3,x+s/2,y+s/3,p);}}
         @Override public boolean onTouchEvent(android.view.MotionEvent e){float scale=Math.min(getWidth()/960f,getHeight()/540f);if(scale<=0)return true;if(e.getAction()==MotionEvent.ACTION_DOWN){dx=e.getX();dy=e.getY();if(run){jumpRequested=true;invalidate();return true;}JSONArray a=objects();double best=Double.MAX_VALUE;for(int i=0;i<a.length();i++){JSONObject o=a.optJSONObject(i);double ox=(dx-getWidth()/2f+480*scale)/scale,oy=(dy-getHeight()/2f+270*scale)/scale;double dd=Math.pow(ox-o.optDouble("x")-o.optDouble("w")/2,2)+Math.pow(oy-o.optDouble("y")-o.optDouble("h")/2,2);if(dd<best){best=dd;selected=i;}}if(selected<a.length()){JSONObject o=a.optJSONObject(selected);sx=o.optDouble("x");sy=o.optDouble("y");drag=true;}invalidate();return true;}if(e.getAction()==MotionEvent.ACTION_MOVE&&drag){JSONObject o=objects().optJSONObject(selected);try{o.put("x",Math.max(0,Math.min(900,sx+(e.getX()-dx)/scale)));o.put("y",Math.max(0,Math.min(500,sy+(e.getY()-dy)/scale)));}catch(Exception ignored){}invalidate();return true;}if(e.getAction()==MotionEvent.ACTION_UP){if(drag)save();drag=false;return true;}return true;}
     }
 }
