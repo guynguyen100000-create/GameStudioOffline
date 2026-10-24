@@ -476,8 +476,8 @@ public class MainActivity extends Activity {
         String low=action.toLowerCase(Locale.ROOT);
         String command=action.trim();
         Matcher customSet=Pattern.compile("(?i)^set\\s+([A-Za-z_][A-Za-z0-9_.]*)\\s*=\\s*(.+)$").matcher(command);
-        Matcher customAdd=Pattern.compile("(?i)^add\\s+([A-Za-z_][A-Za-z0-9_]*)\\s+(.+)$").matcher(command);
-        Matcher customSub=Pattern.compile("(?i)^subtract\\s+([A-Za-z_][A-Za-z0-9_]*)\\s+(.+)$").matcher(command);
+        Matcher customAdd=Pattern.compile("(?i)^add\\s+([A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)?)\\s+(.+)$").matcher(command);
+        Matcher customSub=Pattern.compile("(?i)^subtract\\s+([A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)?)\\s+(.+)$").matcher(command);
         Matcher teleport=Pattern.compile("(?i)^teleport\\s+([A-Za-z_][A-Za-z0-9_]*)\\s+(-?\\d+(?:\\.\\d+)?)\\s+(-?\\d+(?:\\.\\d+)?)$").matcher(command);
         Matcher spawnAtPlayer=Pattern.compile("(?i)^spawn\\s+([A-Za-z_][A-Za-z0-9_]*)\\s+at\\s+player(?:\\s+(-?\\d+(?:\\.\\d+)?)\\s+(-?\\d+(?:\\.\\d+)?))?$").matcher(command);
         Matcher spawn=Pattern.compile("(?i)^spawn\\s+([A-Za-z_][A-Za-z0-9_]*)\\s+(-?\\d+(?:\\.\\d+)?)\\s+(-?\\d+(?:\\.\\d+)?)(?:\\s+(-?\\d+(?:\\.\\d+)?)\\s+(-?\\d+(?:\\.\\d+)?))?$").matcher(command);
