@@ -110,7 +110,7 @@ public class MainActivity extends Activity {
         }catch(Exception e){toast("Lỗi tạo dự án: "+e.getMessage());}
     }
     int selected=0;
-    final String[] triggerChoices={"Khi bắt đầu cảnh","Mỗi khung hình","Mỗi 1 giây","Mỗi 5 giây","Mỗi 10 giây","Khi Player chạm Coin","Khi Player chạm Enemy","Khi bấm nút Nhảy","Khi điều kiện chuyển thành đúng","Trong khi điều kiện đúng","Khi Player rơi khỏi màn hình"};
+    final String[] triggerChoices={"Khi bắt đầu cảnh","Mỗi khung hình","Mỗi 1 giây","Mỗi 5 giây","Mỗi 10 giây","Khi Player chạm Coin","Khi Player chạm Enemy","Khi Player chạm Cube","Khi Player chạm Platform","Khi Player chạm bất kỳ đối tượng nào","Khi bấm nút Nhảy","Khi điều kiện chuyển thành đúng","Trong khi điều kiện đúng","Khi Player rơi khỏi màn hình"};
     final String[] actionChoices={"Đặt biến Score = 0","Tăng Score thêm 1","Tăng Score thêm 10","Giảm Score đi 1","Đặt biến Lives = 3","Tăng Lives thêm 1","Ẩn Coin","Hiện Coin","Ẩn Enemy","Hiện Enemy","Cho Player nhảy","Trừ 1 mạng","Di chuyển Player","Di chuyển Player sang trái","Di chuyển Player sang phải","Hồi sinh Player","Đặt Gravity = 950","Đặt MoveSpeed = 240","Đặt JumpStrength = 430","Lệnh tùy chỉnh (xem ô bên dưới)"};
     // Runtime state is separate from editor data; play-testing never changes saved object positions.
     final Map<String,Double> runtimeVars = new HashMap<>();
@@ -196,7 +196,7 @@ public class MainActivity extends Activity {
                 }
             }
             else if("jump".equals(phase))match=trigger.contains("bấm nút nhảy")||trigger.contains("nút nhảy");
-            else if("collision".equals(phase))match=trigger.contains("chạm")&&contactType!=null&&trigger.contains(contactType.toLowerCase(Locale.ROOT));
+            else if("collision".equals(phase))match=trigger.contains("chạm")&&contactType!=null&&(trigger.contains(contactType.toLowerCase(Locale.ROOT))||trigger.contains("bất kỳ đối tượng nào"));
             if(match&&!condition.isEmpty()&&!trigger.contains("điều kiện chuyển thành đúng")&&!trigger.contains("trong khi điều kiện đúng"))match=evaluateCondition(condition);
             if(match){
                 String custom=e.optString("customAction","").trim();
@@ -370,8 +370,9 @@ public class MainActivity extends Activity {
             if(hiddenRuntimeObjects.contains(name)||destroyedRuntimeObjects.contains(name))continue;
             double ox=runtimeObjectCoordinate(o,true),oy=runtimeObjectCoordinate(o,false),ow=Math.max(1,o.optDouble("w")),oh=Math.max(1,o.optDouble("h"));
             boolean overlap=runtimePlayerX<ox+ow&&runtimePlayerX+pw>ox&&runtimePlayerY<oy+oh&&runtimePlayerY+ph>oy;
-            if(type.equals("platform")&&runtimePlayerVY>=0&&oldBottom<=oy+12&&runtimePlayerY+ph>=oy&&runtimePlayerX+pw>ox&&runtimePlayerX<ox+ow){runtimePlayerY=oy-ph;runtimePlayerVY=0;runtimeGrounded=true;}
-            if(overlap&&(type.equals("coin")||type.equals("enemy"))){String key=type+":"+name;currentContacts.add(key);if(!previousContacts.contains(key))executePhase("collision",type);}
+            boolean landedOnThisPlatform=type.equals("platform")&&runtimePlayerVY>=0&&oldBottom<=oy+12&&runtimePlayerY+ph>=oy&&runtimePlayerX+pw>ox&&runtimePlayerX<ox+ow;
+            if(landedOnThisPlatform){runtimePlayerY=oy-ph;runtimePlayerVY=0;runtimeGrounded=true;String key="platform:"+name;currentContacts.add(key);if(!previousContacts.contains(key))executePhase("collision","platform");}
+            if(overlap&&(type.equals("coin")||type.equals("enemy")||type.equals("cube"))){String key=type+":"+name;currentContacts.add(key);if(!previousContacts.contains(key))executePhase("collision",type);}
         }
         if(runtimePlayerY+ph>=500){runtimePlayerY=500-ph;runtimePlayerVY=0;runtimeGrounded=true;}
         previousContacts.clear();previousContacts.addAll(currentContacts);
