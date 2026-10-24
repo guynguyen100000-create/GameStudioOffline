@@ -528,6 +528,8 @@ public class MainActivity extends Activity {
         if(project==null){toast("Chưa mở dự án");return;}
         String projectName=project.optString("name","").trim();
         if(projectName.isEmpty())errors.add("• Dự án chưa có tên.");
+        String dimension=project.optString("dimension","").trim();
+        if(!dimension.equalsIgnoreCase("2D")&&!dimension.equalsIgnoreCase("3D"))errors.add("• Loại cảnh phải là 2D hoặc 3D.");
         int width=project.optInt("width",0),height=project.optInt("height",0);
         if(width<=0||height<=0)errors.add("• Kích thước cảnh phải lớn hơn 0.");
         JSONArray os=objects();HashSet<String> names=new HashSet<>();boolean hasPlayer=false;
@@ -537,15 +539,23 @@ public class MainActivity extends Activity {
             if(name.isEmpty())errors.add("• Đối tượng thứ "+(i+1)+" chưa có tên.");
             else if(!names.add(name.toLowerCase(Locale.ROOT)))errors.add("• Tên đối tượng bị trùng: "+name+" (các lệnh sẽ khó xác định đúng đối tượng).");
             if(isPlayerObject(o))hasPlayer=true;
-            if(o.optDouble("w",0)<0||o.optDouble("h",0)<0)errors.add("• Kích thước của "+(name.isEmpty()?"đối tượng "+(i+1):name)+" không được âm.");
+            String objectLabel=name.isEmpty()?"đối tượng "+(i+1):name;
+            double x=o.optDouble("x",Double.NaN),y=o.optDouble("y",Double.NaN),w=o.optDouble("w",Double.NaN),h=o.optDouble("h",Double.NaN);
+            double health=o.optDouble("health",100),vx=o.optDouble("vx",0),vy=o.optDouble("vy",0);
+            if(!Double.isFinite(x)||!Double.isFinite(y)||!Double.isFinite(w)||!Double.isFinite(h))errors.add("• Tọa độ/kích thước của "+objectLabel+" phải là số hữu hạn.");
+            if(w<0||h<0)errors.add("• Kích thước của "+objectLabel+" không được âm.");
+            if(!Double.isFinite(health)||health<0)errors.add("• Máu ban đầu của "+objectLabel+" phải là số không âm.");
+            if(!Double.isFinite(vx)||!Double.isFinite(vy))errors.add("• Vận tốc ban đầu của "+objectLabel+" phải là số hữu hạn.");
         }
         if(!hasPlayer)warnings.add("• Chưa có Player; các sự kiện điều khiển nhân vật sẽ không hoạt động.");
         JSONArray vars=project.optJSONArray("variables");HashSet<String> varNames=new HashSet<>();
         if(vars!=null)for(int i=0;i<vars.length();i++){
             JSONObject v=vars.optJSONObject(i);if(v==null){errors.add("• Biến thứ "+(i+1)+" không hợp lệ.");continue;}
             String name=v.optString("name","").trim();
+            double value=v.optDouble("value",Double.NaN);
             if(!name.matches("[A-Za-z_][A-Za-z0-9_]*"))errors.add("• Tên biến không hợp lệ: "+(name.isEmpty()?"(trống)":name)+".");
             else if(!varNames.add(name.toLowerCase(Locale.ROOT)))errors.add("• Tên biến bị trùng: "+name+".");
+            if(!Double.isFinite(value))errors.add("• Giá trị ban đầu của biến "+(name.isEmpty()?"(không tên)":name)+" phải là số hữu hạn.");
         }
         JSONArray events=project.optJSONArray("events");
         if(events!=null)for(int i=0;i<events.length();i++){
