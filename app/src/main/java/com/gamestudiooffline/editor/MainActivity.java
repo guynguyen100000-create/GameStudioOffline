@@ -392,7 +392,7 @@ public class MainActivity extends Activity {
         }
     }
     void setRuntimeValue(String key,double value){
-        Matcher objectCoordinate=Pattern.compile("(?i)^([A-Za-z_][A-Za-z0-9_]*)\\\\.(X|Y|VX|VY|Health)$").matcher(key);
+        Matcher objectCoordinate=Pattern.compile("(?i)^([A-Za-z_][A-Za-z0-9_]*)\.(X|Y|VX|VY|Health)$").matcher(key);
         if(objectCoordinate.matches()){
             String target=resolveLastHitTarget(objectCoordinate.group(1));
             JSONObject object=findObject(target);
