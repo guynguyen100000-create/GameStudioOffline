@@ -157,7 +157,7 @@ public class MainActivity extends Activity {
         return exactNameExists?name.equals(q):(type.equals(q)||name.contains(q));
     }
     void cleanupRuntimeSpawns(){
-        java.util.Iterator<JSONObject> it=runtimeSpawnedObjects.iterator();while(it.hasNext()){JSONObject o=it.next();String n=o.optString("name","");double x=runtimeObjectCoordinate(o,true),y=runtimeObjectCoordinate(o,false);if(x < -160||x > 1120||y < -160||y > 700){it.remove();runtimeObjectX.remove(n);runtimeObjectY.remove(n);runtimeObjectVX.remove(n);runtimeObjectVY.remove(n);runtimeObjectHealth.remove(n);hiddenRuntimeObjects.remove(n);destroyedRuntimeObjects.remove(n);previousContacts.remove(o.optString("type","")+":"+n);}}
+        java.util.Iterator<JSONObject> it=runtimeSpawnedObjects.iterator();while(it.hasNext()){JSONObject o=it.next();String n=o.optString("name","");double x=runtimeObjectCoordinate(o,true),y=runtimeObjectCoordinate(o,false);if(destroyedRuntimeObjects.contains(n)||x < -160||x > 1120||y < -160||y > 700){it.remove();runtimeObjectX.remove(n);runtimeObjectY.remove(n);runtimeObjectVX.remove(n);runtimeObjectVY.remove(n);runtimeObjectHealth.remove(n);runtimeFollowSpeed.remove(n);hiddenRuntimeObjects.remove(n);destroyedRuntimeObjects.remove(n);previousContacts.remove(o.optString("type","")+":"+n);previousContacts.removeIf(k->k.contains(n));}}
     }
     JSONObject findObject(String query){
         if(query==null)return null;String q=query.trim();JSONArray a=objects();
