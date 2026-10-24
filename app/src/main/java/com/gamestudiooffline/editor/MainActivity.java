@@ -86,7 +86,7 @@ public class MainActivity extends Activity {
         root.addView(label("Dự án mới",18,fg,true));
         nameBox=new EditText(this);nameBox.setSingleLine(true);nameBox.setHint("Tên dự án");nameBox.setHintTextColor(muted);nameBox.setTextColor(fg);nameBox.setBackgroundColor(panel);root.addView(nameBox,new LinearLayout.LayoutParams(-1,dp(48)));
         LinearLayout creation=row();creation.addView(btn("Tạo game 2D",()->create("2D")));creation.addView(btn("Tạo game 3D",()->create("3D")));root.addView(creation);
-        root.addView(btn("Tạo mẫu game (Đi cảnh / Bắn súng / RPG)",this::showTemplatePicker));
+        root.addView(btn("Tạo mẫu game (Đi cảnh / Bắn súng / RPG / Tower Defense)",this::showTemplatePicker));
         root.addView(label("Dự án đã lưu trên máy",18,fg,true));
         File[] fs=dir().listFiles((f,n)->n.endsWith(".gsproj"));
         if(fs==null||fs.length==0)root.addView(card("Chưa có dự án. Tạo một dự án mới phía trên."));
