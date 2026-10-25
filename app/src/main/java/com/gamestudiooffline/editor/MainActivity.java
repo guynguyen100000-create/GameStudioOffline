@@ -636,9 +636,10 @@ public class MainActivity extends Activity {
             String name=o.optString("name","").trim();
             if(name.isEmpty())errors.add("• Đối tượng thứ "+(i+1)+" chưa có tên.");
             else if(!names.add(name.toLowerCase(Locale.ROOT)))errors.add("• Tên đối tượng bị trùng: "+name+" (các lệnh sẽ khó xác định đúng đối tượng).");
-            if(isPlayerObject(o))hasPlayer=true;
+            if(isPlayerObject(o)){hasPlayer=true;if(!o.optBoolean("visible",true))warnings.add("• Nhân vật "+name+" đang bị ẩn; khi chạy thử có thể không nhìn thấy nhân vật.");if(!objectCollisionEnabled(o))warnings.add("• Va chạm của nhân vật "+name+" đang tắt; nền sàn và sự kiện va chạm có thể không hoạt động như mong đợi.");}
             String objectLabel=name.isEmpty()?"đối tượng "+(i+1):name;
             double x=o.optDouble("x",Double.NaN),y=o.optDouble("y",Double.NaN),w=o.optDouble("w",Double.NaN),h=o.optDouble("h",Double.NaN);
+            if(finiteNumber(x)&&finiteNumber(y)&&finiteNumber(w)&&finiteNumber(h)&&(x+w<0||y+h<0||x>width||y>height))warnings.add("• "+objectLabel+" nằm hoàn toàn ngoài màn chơi.");
             double health=o.optDouble("health",100),vx=o.optDouble("vx",0),vy=o.optDouble("vy",0);
             if(!finiteNumber(x)||!finiteNumber(y)||!finiteNumber(w)||!finiteNumber(h))errors.add("• Tọa độ/kích thước của "+objectLabel+" phải là số hữu hạn.");
             if(w<0||h<0)errors.add("• Kích thước của "+objectLabel+" không được âm.");
