@@ -1208,7 +1208,7 @@ public class MainActivity extends Activity {
                 selected=hit;
                 JSONObject o=a.optJSONObject(selected);
                 sx=o.optDouble("x");sy=o.optDouble("y");
-                if(!resizing)drag=!o.optBoolean("locked",false);
+                drag=resizing||!o.optBoolean("locked",false);
                 invalidate();return true;
             }
             if(e.getAction()==MotionEvent.ACTION_MOVE&&drag){
