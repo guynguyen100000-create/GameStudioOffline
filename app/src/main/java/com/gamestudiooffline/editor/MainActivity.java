@@ -573,7 +573,7 @@ public class MainActivity extends Activity {
         }
         JSONArray all=runtimeSceneObjects();Set<String> currentContacts=new HashSet<>();
         for(int i=0;i<all.length();i++){
-            JSONObject o=all.optJSONObject(i);if(o==null||o==player||!o.optBoolean("visible",true))continue;
+            JSONObject o=all.optJSONObject(i);if(o==null||o==player)continue;
             String type=o.optString("type","").toLowerCase(Locale.ROOT),name=o.optString("name","Object");
             if(hiddenRuntimeObjects.contains(name)||destroyedRuntimeObjects.contains(name))continue;
             Double followSpeed=runtimeFollowSpeed.get(name);if(followSpeed!=null){if(player!=null){double dx=runtimePlayerX-runtimeObjectCoordinate(o,true),dy=runtimePlayerY-runtimeObjectCoordinate(o,false),distance=Math.sqrt(dx*dx+dy*dy);if(distance>1){runtimeObjectVX.put(name,dx/distance*followSpeed);runtimeObjectVY.put(name,dy/distance*followSpeed);}else{runtimeObjectVX.put(name,0d);runtimeObjectVY.put(name,0d);}}else{runtimeObjectVX.put(name,0d);runtimeObjectVY.put(name,0d);}}
@@ -586,7 +586,7 @@ public class MainActivity extends Activity {
                 if(overlap&&!type.equals("camera")&&!type.equals("light")&&!type.equals("player")){String key=type+":"+name;currentContacts.add(key);if(!previousContacts.contains(key))executePhase("collision",type);}
             }
         }
-        for(int i=0;i<all.length();i++){JSONObject a=all.optJSONObject(i);if(a==null||!a.optBoolean("visible",true))continue;String nameA=a.optString("name","Object"),typeA=a.optString("type","").toLowerCase(Locale.ROOT);if(typeA.equals("player")||typeA.equals("camera")||typeA.equals("light")||hiddenRuntimeObjects.contains(nameA)||destroyedRuntimeObjects.contains(nameA))continue;double ax=runtimeObjectCoordinate(a,true),ay=runtimeObjectCoordinate(a,false),aw=Math.max(1,a.optDouble("w",1)),ah=Math.max(1,a.optDouble("h",1));for(int j=i+1;j<all.length();j++){JSONObject b=all.optJSONObject(j);if(b==null||!b.optBoolean("visible",true))continue;String nameB=b.optString("name","Object"),typeB=b.optString("type","").toLowerCase(Locale.ROOT);if(typeB.equals("player")||typeB.equals("camera")||typeB.equals("light")||hiddenRuntimeObjects.contains(nameB)||destroyedRuntimeObjects.contains(nameB))continue;double bx=runtimeObjectCoordinate(b,true),by=runtimeObjectCoordinate(b,false),bw=Math.max(1,b.optDouble("w",1)),bh=Math.max(1,b.optDouble("h",1));boolean overlap=ax<bx+bw&&ax+aw>bx&&ay<by+bh&&ay+ah>by;if(overlap){String key="pair:"+nameA+":"+nameB;currentContacts.add(key);if(!previousContacts.contains(key)){lastObjectCollisionA=nameA;lastObjectCollisionB=nameB;lastObjectCollisionTypeA=typeA;lastObjectCollisionTypeB=typeB;executePhase("objectCollision",typeA+"|"+typeB);if(destroyedRuntimeObjects.contains(nameA)||destroyedRuntimeObjects.contains(nameB))break;}}}}
+        for(int i=0;i<all.length();i++){JSONObject a=all.optJSONObject(i);if(a==null)continue;String nameA=a.optString("name","Object"),typeA=a.optString("type","").toLowerCase(Locale.ROOT);if(typeA.equals("player")||typeA.equals("camera")||typeA.equals("light")||hiddenRuntimeObjects.contains(nameA)||destroyedRuntimeObjects.contains(nameA))continue;double ax=runtimeObjectCoordinate(a,true),ay=runtimeObjectCoordinate(a,false),aw=Math.max(1,a.optDouble("w",1)),ah=Math.max(1,a.optDouble("h",1));for(int j=i+1;j<all.length();j++){JSONObject b=all.optJSONObject(j);if(b==null)continue;String nameB=b.optString("name","Object"),typeB=b.optString("type","").toLowerCase(Locale.ROOT);if(typeB.equals("player")||typeB.equals("camera")||typeB.equals("light")||hiddenRuntimeObjects.contains(nameB)||destroyedRuntimeObjects.contains(nameB))continue;double bx=runtimeObjectCoordinate(b,true),by=runtimeObjectCoordinate(b,false),bw=Math.max(1,b.optDouble("w",1)),bh=Math.max(1,b.optDouble("h",1));boolean overlap=ax<bx+bw&&ax+aw>bx&&ay<by+bh&&ay+ah>by;if(overlap){String key="pair:"+nameA+":"+nameB;currentContacts.add(key);if(!previousContacts.contains(key)){lastObjectCollisionA=nameA;lastObjectCollisionB=nameB;lastObjectCollisionTypeA=typeA;lastObjectCollisionTypeB=typeB;executePhase("objectCollision",typeA+"|"+typeB);if(destroyedRuntimeObjects.contains(nameA)||destroyedRuntimeObjects.contains(nameB))break;}}}}
         cleanupRuntimeSpawns();
         // Platforms handle landing above; do not force an invisible floor, so the player can fall off-screen.
         previousContacts.clear();previousContacts.addAll(currentContacts);
@@ -790,6 +790,7 @@ public class MainActivity extends Activity {
         JSONArray a=objects();if(a.length()==0)return;selected=Math.max(0,Math.min(selected,a.length()-1));JSONObject o=a.optJSONObject(selected);
         LinearLayout box=new LinearLayout(this);box.setPadding(dp(10),dp(6),dp(10),dp(6));box.setOrientation(LinearLayout.VERTICAL);
         EditText n=field(o.optString("name"));EditText x=field(""+(int)o.optDouble("x"));EditText y=field(""+(int)o.optDouble("y"));EditText w=field(""+(int)o.optDouble("w"));EditText h=field(""+(int)o.optDouble("h"));EditText health=field(""+(int)o.optDouble("health",100));EditText vx=field(""+o.optDouble("vx",0));EditText vy=field(""+o.optDouble("vy",0));
+        CheckBox visible=new CheckBox(this);visible.setText("Đối tượng đang hiển thị");visible.setTextColor(fg);visible.setButtonTintList(android.content.res.ColorStateList.valueOf(accent));visible.setChecked(o.optBoolean("visible",true));
         String[] types={"player","enemy","cube","coin","platform","projectile"};
         String[] typeLabels={"Nhân vật (Player)","Kẻ địch (Enemy)","Khối 3D (Cube)","Vật phẩm (Coin)","Nền sàn (Platform)","Đạn (Projectile)"};
         Spinner type=new Spinner(this);
@@ -804,7 +805,8 @@ public class MainActivity extends Activity {
         for(int i=0;i<colors.length;i++)if(colors[i]==oldColor){colorIndex=i;break;}
         color.setSelection(colorIndex);
         for(Object[] pair:new Object[][]{{"Tên",n},{"Loại đối tượng",type},{"Màu",color},{"Vị trí X",x},{"Vị trí Y",y},{"Chiều rộng",w},{"Chiều cao",h},{"Máu ban đầu (Health)",health},{"Vận tốc X ban đầu (đơn vị/giây)",vx},{"Vận tốc Y ban đầu (đơn vị/giây)",vy}}){box.addView(label((String)pair[0],12,muted,false));box.addView((View)pair[1]);}
-        new AlertDialog.Builder(this).setTitle("Thuộc tính đối tượng").setView(box).setNegativeButton("Hủy",null).setPositiveButton("Lưu",(d,z)->{try{String newName=n.getText().toString().trim();if(newName.isEmpty()){toast("Tên đối tượng không được để trống");return;}if(objectNameExists(newName,a,selected)){toast("Tên đối tượng đã tồn tại: "+newName);return;}double nx=num(x),ny=num(y),nw=Math.max(1,num(w)),nh=Math.max(1,num(h)),hp=Math.max(0,num(health)),nvx=num(vx),nvy=num(vy);o.put("name",newName);o.put("type",types[type.getSelectedItemPosition()]);o.put("color",colors[color.getSelectedItemPosition()]);o.put("x",nx);o.put("y",ny);o.put("w",nw);o.put("h",nh);o.put("health",hp);o.put("vx",nvx);o.put("vy",nvy);spriteCache.clear();save();editor();}catch(Exception ex){toast("Các giá trị phải là số hợp lệ và hữu hạn");}}).show();
+        box.addView(label("Hiển thị",12,muted,false));box.addView(visible);
+        new AlertDialog.Builder(this).setTitle("Thuộc tính đối tượng").setView(box).setNegativeButton("Hủy",null).setPositiveButton("Lưu",(d,z)->{try{String newName=n.getText().toString().trim();if(newName.isEmpty()){toast("Tên đối tượng không được để trống");return;}if(objectNameExists(newName,a,selected)){toast("Tên đối tượng đã tồn tại: "+newName);return;}double nx=num(x),ny=num(y),nw=Math.max(1,num(w)),nh=Math.max(1,num(h)),hp=Math.max(0,num(health)),nvx=num(vx),nvy=num(vy);o.put("name",newName);o.put("type",types[type.getSelectedItemPosition()]);o.put("color",colors[color.getSelectedItemPosition()]);o.put("x",nx);o.put("y",ny);o.put("w",nw);o.put("h",nh);o.put("health",hp);o.put("vx",nvx);o.put("vy",nvy);o.put("visible",visible.isChecked());spriteCache.clear();save();editor();}catch(Exception ex){toast("Các giá trị phải là số hợp lệ và hữu hạn");}}).show();
     }
     void duplicateSelected(){
         JSONArray a=objects();if(a.length()==0)return;
@@ -1029,7 +1031,7 @@ public class MainActivity extends Activity {
                 int hit=-1;
                 // Later objects are drawn on top, so test them first.
                 for(int i=a.length()-1;i>=0;i--){
-                    JSONObject o=a.optJSONObject(i);if(o==null)continue;
+                    JSONObject o=a.optJSONObject(i);if(o==null||!o.optBoolean("visible",true))continue;
                     String type=o.optString("type","");
                     double ox=o.optDouble("x",0),oy=o.optDouble("y",0);
                     double ow=o.optDouble("w",1),oh=o.optDouble("h",1);
