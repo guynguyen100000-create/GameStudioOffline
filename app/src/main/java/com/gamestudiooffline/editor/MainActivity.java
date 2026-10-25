@@ -84,8 +84,9 @@ public class MainActivity extends Activity {
             double x=o.optDouble("x",Double.NaN),y=o.optDouble("y",Double.NaN);
             double w=o.optDouble("w",Double.NaN),h=o.optDouble("h",Double.NaN);
             double health=o.optDouble("health",100),vx=o.optDouble("vx",0),vy=o.optDouble("vy",0),angle=o.optDouble("angle",0),opacity=o.optDouble("opacity",255);
+            int spriteColumns=o.optInt("spriteColumns",1),spriteRows=o.optInt("spriteRows",1),spriteFps=o.optInt("spriteFps",8);
             if(!finiteNumber(x)||!finiteNumber(y)||!finiteNumber(w)||!finiteNumber(h)||
-               !finiteNumber(health)||!finiteNumber(vx)||!finiteNumber(vy)||!finiteNumber(angle)||!finiteNumber(opacity)||w<0||h<0||health<0||opacity<0||opacity>255)
+               !finiteNumber(health)||!finiteNumber(vx)||!finiteNumber(vy)||!finiteNumber(angle)||!finiteNumber(opacity)||w<0||h<0||health<0||opacity<0||opacity>255||spriteColumns<1||spriteColumns>16||spriteRows<1||spriteRows>16||spriteFps<1||spriteFps>60)
                 throw new IOException("Dữ liệu số của đối tượng "+o.optString("name")+" không hợp lệ");
         }
         JSONArray variables=loaded.optJSONArray("variables");
@@ -943,8 +944,14 @@ public class MainActivity extends Activity {
         JSONArray a=objects();if(a.length()==0)return;selected=Math.max(0,Math.min(selected,a.length()-1));JSONObject o=a.optJSONObject(selected);
         LinearLayout box=new LinearLayout(this);box.setPadding(dp(10),dp(6),dp(10),dp(6));box.setOrientation(LinearLayout.VERTICAL);
         EditText n=field(o.optString("name"));EditText x=field(""+(int)o.optDouble("x"));EditText y=field(""+(int)o.optDouble("y"));EditText w=field(""+(int)o.optDouble("w"));EditText h=field(""+(int)o.optDouble("h"));EditText health=field(""+(int)o.optDouble("health",100));EditText vx=field(""+o.optDouble("vx",0));EditText vy=field(""+o.optDouble("vy",0));EditText angle=field(""+o.optDouble("angle",0));EditText opacity=field(""+(int)o.optDouble("opacity",255));
+        EditText spriteColumns=field(Integer.toString(o.optInt("spriteColumns",1)));
+        EditText spriteRows=field(Integer.toString(o.optInt("spriteRows",1)));
+        EditText spriteFps=field(Integer.toString(o.optInt("spriteFps",8)));
         angle.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_SIGNED|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
         opacity.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+        spriteColumns.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+        spriteRows.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+        spriteFps.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
         CheckBox visible=new CheckBox(this);visible.setText("Đối tượng đang hiển thị");visible.setTextColor(fg);visible.setButtonTintList(android.content.res.ColorStateList.valueOf(accent));visible.setChecked(o.optBoolean("visible",true));
         CheckBox collisions=new CheckBox(this);collisions.setText("Cho phép va chạm vật lý/sự kiện");collisions.setTextColor(fg);collisions.setButtonTintList(android.content.res.ColorStateList.valueOf(accent));collisions.setChecked(objectCollisionEnabled(o));
         String[] types={"player","enemy","cube","coin","platform","projectile"};
@@ -961,9 +968,12 @@ public class MainActivity extends Activity {
         for(int i=0;i<colors.length;i++)if(colors[i]==oldColor){colorIndex=i;break;}
         color.setSelection(colorIndex);
         for(Object[] pair:new Object[][]{{"Tên",n},{"Loại đối tượng",type},{"Màu",color},{"Vị trí X",x},{"Vị trí Y",y},{"Chiều rộng",w},{"Chiều cao",h},{"Góc xoay (độ)",angle},{"Độ trong suốt (0–255)",opacity},{"Máu ban đầu (Health)",health},{"Vận tốc X ban đầu (đơn vị/giây)",vx},{"Vận tốc Y ban đầu (đơn vị/giây)",vy}}){box.addView(label((String)pair[0],12,muted,false));box.addView((View)pair[1]);}
+        box.addView(label("Hoạt ảnh Sprite Sheet (ảnh chia ô)",13,muted,true));
+        box.addView(label("Dùng ảnh có các khung hình xếp trái sang phải, từ trên xuống dưới. Đặt 1 × 1 cho ảnh tĩnh.",11,muted,false));
+        for(Object[] pair:new Object[][]{{"Số cột khung hình (1–16)",spriteColumns},{"Số hàng khung hình (1–16)",spriteRows},{"Tốc độ (FPS, 1–60)",spriteFps}}){box.addView(label((String)pair[0],12,muted,false));box.addView((View)pair[1]);}
         box.addView(label("Hiển thị",12,muted,false));box.addView(visible);
         box.addView(label("Va chạm",12,muted,false));box.addView(collisions);
-        new AlertDialog.Builder(this).setTitle("Thuộc tính đối tượng").setView(box).setNegativeButton("Hủy",null).setPositiveButton("Lưu",(d,z)->{try{String newName=n.getText().toString().trim();if(newName.isEmpty()){toast("Tên đối tượng không được để trống");return;}if(objectNameExists(newName,a,selected)){toast("Tên đối tượng đã tồn tại: "+newName);return;}double nx=num(x),ny=num(y),nw=Math.max(1,num(w)),nh=Math.max(1,num(h)),hp=Math.max(0,num(health)),nvx=num(vx),nvy=num(vy),rotation=num(angle),alpha=num(opacity);if(alpha<0||alpha>255){toast("Độ trong suốt phải nằm trong khoảng 0–255");return;}o.put("name",newName);o.put("type",types[type.getSelectedItemPosition()]);o.put("color",colors[color.getSelectedItemPosition()]);o.put("x",nx);o.put("y",ny);o.put("w",nw);o.put("h",nh);o.put("angle",rotation);o.put("opacity",(int)Math.round(alpha));o.put("health",hp);o.put("vx",nvx);o.put("vy",nvy);o.put("visible",visible.isChecked());o.put("collisionEnabled",collisions.isChecked());spriteCache.clear();save();editor();}catch(Exception ex){toast("Các giá trị phải là số hợp lệ và hữu hạn");}}).show();
+        new AlertDialog.Builder(this).setTitle("Thuộc tính đối tượng").setView(box).setNegativeButton("Hủy",null).setPositiveButton("Lưu",(d,z)->{try{String newName=n.getText().toString().trim();if(newName.isEmpty()){toast("Tên đối tượng không được để trống");return;}if(objectNameExists(newName,a,selected)){toast("Tên đối tượng đã tồn tại: "+newName);return;}double nx=num(x),ny=num(y),nw=Math.max(1,num(w)),nh=Math.max(1,num(h)),hp=Math.max(0,num(health)),nvx=num(vx),nvy=num(vy),rotation=num(angle),alpha=num(opacity);int columns=Integer.parseInt(spriteColumns.getText().toString().trim()),rows=Integer.parseInt(spriteRows.getText().toString().trim()),fps=Integer.parseInt(spriteFps.getText().toString().trim());if(alpha<0||alpha>255){toast("Độ trong suốt phải nằm trong khoảng 0–255");return;}if(columns<1||columns>16||rows<1||rows>16||fps<1||fps>60){toast("Cột/hàng phải 1–16 và FPS phải 1–60");return;}o.put("spriteColumns",columns);o.put("spriteRows",rows);o.put("spriteFps",fps);o.put("name",newName);o.put("type",types[type.getSelectedItemPosition()]);o.put("color",colors[color.getSelectedItemPosition()]);o.put("x",nx);o.put("y",ny);o.put("w",nw);o.put("h",nh);o.put("angle",rotation);o.put("opacity",(int)Math.round(alpha));o.put("health",hp);o.put("vx",nvx);o.put("vy",nvy);o.put("visible",visible.isChecked());o.put("collisionEnabled",collisions.isChecked());spriteCache.clear();save();editor();}catch(Exception ex){toast("Các giá trị phải là số hợp lệ và hữu hạn");}}).show();
     }
     void duplicateSelected(){
         JSONArray a=objects();if(a.length()==0)return;
@@ -1233,7 +1243,22 @@ public class MainActivity extends Activity {
                 p.setColor(o.optInt("color",Color.WHITE));
                 Bitmap sprite=loadSprite(o.optString("image",""));
                 if(sprite!=null){
-                    c.drawBitmap(sprite,null,new RectF(x,y,x+Math.max(1,w),y+Math.max(1,h)),p);
+                    int columns=Math.max(1,Math.min(16,Math.min(o.optInt("spriteColumns",1),sprite.getWidth())));
+                    int rows=Math.max(1,Math.min(16,Math.min(o.optInt("spriteRows",1),sprite.getHeight())));
+                    int frameCount=columns*rows;
+                    int frame=0;
+                    if(run&&frameCount>1){
+                        int fps=Math.max(1,Math.min(60,o.optInt("spriteFps",8)));
+                        long elapsed=Math.max(0L,System.currentTimeMillis()-runtimeStartMillis);
+                        frame=(int)((elapsed*fps/1000L)%frameCount);
+                    }
+                    int frameColumn=frame%columns,frameRow=frame/columns;
+                    int frameWidth=Math.max(1,sprite.getWidth()/columns),frameHeight=Math.max(1,sprite.getHeight()/rows);
+                    int left=frameColumn*frameWidth,top=frameRow*frameHeight;
+                    int right=frameColumn==columns-1?sprite.getWidth():Math.min(sprite.getWidth(),left+frameWidth);
+                    int bottom=frameRow==rows-1?sprite.getHeight():Math.min(sprite.getHeight(),top+frameHeight);
+                    Rect source=new Rect(left,top,right,bottom);
+                    c.drawBitmap(sprite,source,new RectF(x,y,x+Math.max(1,w),y+Math.max(1,h)),p);
                 }else if(type.equals("coin")||type.equals("projectile")){
                     c.drawCircle(x+w/2f,y+h/2f,Math.max(w,h)/2f,p);
                 }else if(type.equals("platform")){
