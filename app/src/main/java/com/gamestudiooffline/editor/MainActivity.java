@@ -1027,7 +1027,7 @@ public class MainActivity extends Activity {
         @Override protected void onDraw(Canvas c){super.onDraw(c);c.drawColor(Color.rgb(20,33,51));if(run)tickRuntime();int sw=sceneWidth(),sh=sceneHeight();float scale=Math.min(getWidth()/(float)sw,getHeight()/(float)sh);if(scale<=0)return;c.save();c.translate((getWidth()-sw*scale)/2,(getHeight()-sh*scale)/2);c.scale(scale,scale);if(three)draw3(c);else draw2(c);c.restore();p.setColor(muted);p.setTextSize(18);c.drawText(run?(three?"CHẠY THỬ 3D":"CHẠY THỬ 2D"):(three?"3D VIEW":"2D SCENE"),12,24,p);if(run){p.setColor(Color.WHITE);p.setTextSize(20);String extraHud="";if(runtimeVars.containsKey("Gold"))extraHud+="   Gold: "+(int)Math.round(runtimeVars.getOrDefault("Gold",0d));if(runtimeVars.containsKey("Level"))extraHud+="   Level: "+(int)Math.round(runtimeVars.getOrDefault("Level",1d));c.drawText("Score: "+runtimeScore+"   Lives: "+runtimeLives+(findPlayer()!=null?"   HP: "+(int)Math.round(runtimeObjectHealthValue(findPlayer())):"")+extraHud,12,52,p);if(runtimeGameOver){p.setColor(Color.RED);p.setTextSize(38);c.drawText("GAME OVER",Math.max(12,getWidth()/2f-105),getHeight()/2f,p);}postInvalidateDelayed(40);}}
         void draw2(Canvas c){
             int sw=sceneWidth(),sh=sceneHeight();
-            p.setColor(sceneBackgroundColor());c.drawRect(0,0,sw,sh,p);
+            p.setColor(sceneBackgroundColor());p.setAlpha(255);c.drawRect(0,0,sw,sh,p);
             p.setColor(Color.argb(70,255,255,255));
             int grid=Math.max(10,Math.min(80,snapGridSize));
             for(int gx=0;gx<=sw;gx+=grid)c.drawLine(gx,0,gx,sh,p);
@@ -1036,51 +1036,85 @@ public class MainActivity extends Activity {
             for(int i=0;i<a.length();i++){
                 JSONObject o=a.optJSONObject(i);
                 if(o==null||(!run&&!o.optBoolean("visible",true))||
-                   (run&&(hiddenRuntimeObjects.contains(o.optString("name"))||destroyedRuntimeObjects.contains(o.optString("name")))))continue;
+                    (run&&(hiddenRuntimeObjects.contains(o.optString("name"))||destroyedRuntimeObjects.contains(o.optString("name")))))continue;
                 float x=(float)(run?runtimeObjectCoordinate(o,true):o.optDouble("x"));
                 float y=(float)(run?runtimeObjectCoordinate(o,false):o.optDouble("y"));
                 float w=(float)o.optDouble("w"),h=(float)o.optDouble("h");
-                String type=o.optString("type");
-                int opacity=Math.max(0,Math.min(255,o.optInt("opacity",255)));
-                float centerX=x+Math.max(1,w)/2f,centerY=y+Math.max(1,h)/2f;
+                String type=o.optString("type","");
+                float drawW=Math.max(type.equals("platform")?40:1,w);
+                float drawH=Math.max(type.equals("platform")?20:1,h);
+                if(!type.equals("coin")&&!type.equals("projectile")&&!type.equals("platform")){drawW=Math.max(34,w);drawH=Math.max(34,h);}
                 c.save();
-                if(Math.abs(o.optDouble("angle",0))>0.001)c.rotate((float)o.optDouble("angle",0),centerX,centerY);
-                p.setColor(colorWithOpacity(o.optInt("color",Color.WHITE),opacity));
+                c.rotate((float)o.optDouble("angle",0),x+drawW/2f,y+drawH/2f);
+                p.setAlpha(Math.max(0,Math.min(255,o.optInt("opacity",255))));
+                p.setColor(o.optInt("color",Color.WHITE));
                 Bitmap sprite=loadSprite(o.optString("image",""));
                 if(sprite!=null){
-                    p.setAlpha(opacity);
                     c.drawBitmap(sprite,null,new RectF(x,y,x+Math.max(1,w),y+Math.max(1,h)),p);
-                    p.setAlpha(255);
                 }else if(type.equals("coin")||type.equals("projectile")){
-                    p.setColor(colorWithOpacity(o.optInt("color",Color.WHITE),opacity));
-                    c.drawCircle(centerX,centerY,Math.max(w,h)/2f,p);
+                    c.drawCircle(x+w/2f,y+h/2f,Math.max(w,h)/2f,p);
                 }else if(type.equals("platform")){
-                    p.setColor(colorWithOpacity(o.optInt("color",Color.WHITE),opacity));
-                    c.drawRect(x,y,x+Math.max(40,w),y+Math.max(20,h),p);
-                    p.setColor(colorWithOpacity(Color.rgb(117,73,45),opacity));
-                    c.drawRect(x,y+h*.6f,x+Math.max(40,w),y+Math.max(20,h),p);
+                    c.drawRect(x,y,x+drawW,y+drawH,p);
+                    p.setColor(Color.rgb(117,73,45));
+                    c.drawRect(x,y+h*.6f,x+drawW,y+drawH,p);
                 }else if(type.equals("camera")||type.equals("light")){
-                    p.setColor(colorWithOpacity(o.optInt("color",Color.WHITE),opacity));
                     p.setTextSize(25);
                     c.drawText(type.equals("camera")?"CAM":"LGT",x+8,y+32,p);
                 }else{
-                    p.setColor(colorWithOpacity(o.optInt("color",Color.WHITE),opacity));
-                    c.drawRoundRect(x,y,x+Math.max(34,w),y+Math.max(34,h),8,8,p);
-                    p.setColor(colorWithOpacity(Color.WHITE,opacity));
-                    p.setTextSize(13);
+                    c.drawRoundRect(x,y,x+drawW,y+drawH,8,8,p);
+                    p.setColor(Color.WHITE);p.setTextSize(13);
                     c.drawText(o.optString("name"),x,y-4,p);
                 }
-                c.restore();
-                if(run&&(type.equals("enemy")||type.equals("player")))drawRuntimeHealthBar(c,o,x,y,Math.max(34,w));
                 if(!run&&i==selected){
-                    p.setColor(Color.WHITE);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(3);
-                    c.drawRect(x-4,y-4,x+Math.max(34,w)+4,y+Math.max(34,h)+4,p);
+                    p.setAlpha(255);p.setColor(Color.WHITE);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(3);
+                    c.drawRect(x-4,y-4,x+drawW+4,y+drawH+4,p);
                     p.setStyle(Paint.Style.FILL);
                 }
+                c.restore();
+                p.setAlpha(255);
+                if(run&&(type.equals("enemy")||type.equals("player")))drawRuntimeHealthBar(c,o,x,y,drawW);
             }
+            p.setAlpha(255);
         }
         void drawRuntimeHealthBar(Canvas c,JSONObject o,float x,float y,float w){double max=Math.max(1,o.optDouble("health",100)),hp=Math.max(0,Math.min(max,runtimeObjectHealthValue(o)));float top=y-9;p.setColor(Color.rgb(60,30,36));c.drawRect(x,top,x+w,top+5,p);p.setColor(hp/max>.35?Color.rgb(45,210,90):Color.rgb(245,75,70));c.drawRect(x,top,x+(float)(w*hp/max),top+5,p);}
-     void draw3(Canvas c){int sw=sceneWidth(),sh=sceneHeight();p.setColor(sceneBackgroundColor());c.drawRect(0,0,sw,sh,p);p.setColor(Color.argb(95,255,255,255));for(int i=-sw;i<sw*2;i+=50){c.drawLine(sw/2f+i,0,sw/2f+i*.45f,sh,p);c.drawLine(0,sh/2f+i*.24f,sw,sh/2f+i*.24f,p);}JSONArray a=run?runtimeSceneObjects():objects();for(int i=0;i<a.length();i++){JSONObject o=a.optJSONObject(i);if(o==null||(!run&&!o.optBoolean("visible",true))||(run&&(hiddenRuntimeObjects.contains(o.optString("name"))||destroyedRuntimeObjects.contains(o.optString("name")))))continue;String type=o.optString("type");p.setColor(o.optInt("color",Color.BLUE));if(type.equals("camera")||type.equals("light")){p.setTextSize(22);c.drawText(type.equals("camera")?"◉ Camera":"☼ Light",35+i*20,55+i*24,p);continue;}float x=(float)(run?runtimeObjectCoordinate(o,true):o.optDouble("x")),y=(float)(run?runtimeObjectCoordinate(o,false):o.optDouble("y")),s=Math.max(30,(float)o.optDouble("w",60));float rawX=x,rawY=y;x=sw/2f+(rawX-sw/2f)*.72f-(rawY-sh/2f)*.35f;y=sh/2f+10+(rawY-sh/2f)*.48f+(x-sw/2f)*.18f;Path path=new Path();path.moveTo(x,y-s);path.lineTo(x+s/2,y-s+s/3);path.lineTo(x,y-s+2*s/3);path.lineTo(x-s/2,y-s+s/3);path.close();p.setColor(o.optInt("color",Color.BLUE));c.drawPath(path,p);p.setColor(Color.rgb(35,74,138));c.drawRect(x-s/2,y-s+s/3,x,y+s/3,p);p.setColor(Color.rgb(27,57,111));c.drawRect(x,y-s+2*s/3,x+s/2,y+s/3,p);if(run&&(type.equals("enemy")||type.equals("player")))drawRuntimeHealthBar(c,o,x-s/2,y-s,s);}}
+        void draw3(Canvas c){
+            int sw=sceneWidth(),sh=sceneHeight();
+            p.setColor(sceneBackgroundColor());p.setAlpha(255);c.drawRect(0,0,sw,sh,p);
+            p.setColor(Color.argb(95,255,255,255));
+            for(int gx=-sw;gx<sw*2;gx+=50){c.drawLine(sw/2f+gx,0,sw/2f+gx*.45f,sh,p);c.drawLine(0,sh/2f+gx*.24f,sw,sh/2f+gx*.24f,p);}
+            JSONArray a=run?runtimeSceneObjects():objects();
+            for(int i=0;i<a.length();i++){
+                JSONObject o=a.optJSONObject(i);
+                if(o==null||(!run&&!o.optBoolean("visible",true))||
+                    (run&&(hiddenRuntimeObjects.contains(o.optString("name"))||destroyedRuntimeObjects.contains(o.optString("name")))))continue;
+                String type=o.optString("type","");
+                float rawX=(float)(run?runtimeObjectCoordinate(o,true):o.optDouble("x"));
+                float rawY=(float)(run?runtimeObjectCoordinate(o,false):o.optDouble("y"));
+                float size=Math.max(30,(float)o.optDouble("w",60));
+                float x=sw/2f+(rawX-sw/2f)*.72f-(rawY-sh/2f)*.35f;
+                float y=sh/2f+10+(rawY-sh/2f)*.48f+(x-sw/2f)*.18f;
+                c.save();
+                c.rotate((float)o.optDouble("angle",0),x,y);
+                p.setAlpha(Math.max(0,Math.min(255,o.optInt("opacity",255))));
+                p.setColor(o.optInt("color",Color.BLUE));
+                if(type.equals("camera")||type.equals("light")){
+                    p.setTextSize(22);
+                    c.drawText(type.equals("camera")?"◉ Camera":"☼ Light",35+i*20,55+i*24,p);
+                    c.restore();p.setAlpha(255);continue;
+                }
+                Path path=new Path();
+                path.moveTo(x,y-size);path.lineTo(x+size/2,y-size+size/3);
+                path.lineTo(x,y-size+2*size/3);path.lineTo(x-size/2,y-size+size/3);path.close();
+                c.drawPath(path,p);
+                p.setColor(Color.rgb(35,74,138));
+                c.drawRect(x-size/2,y-size+size/3,x,y+size/3,p);
+                p.setColor(Color.rgb(27,57,111));
+                c.drawRect(x,y-size+2*size/3,x+size/2,y+size/3,p);
+                c.restore();p.setAlpha(255);
+                if(run&&(type.equals("enemy")||type.equals("player")))drawRuntimeHealthBar(c,o,x-size/2,y-size,size);
+            }
+            p.setAlpha(255);
+        }
         @Override public boolean onTouchEvent(android.view.MotionEvent e){
             float scale=Math.min(getWidth()/(float)sceneWidth(),getHeight()/(float)sceneHeight());
             if(scale<=0)return true;
