@@ -1069,7 +1069,7 @@ public class MainActivity extends Activity {
         }catch(Exception e){toast("Không xử lý được file: "+e.getMessage());}
     }
     class SceneView extends View{
-        Paint p=new Paint(3);boolean run,three;float dx,dy;double sx,sy;boolean drag;
+        Paint p=new Paint(3);boolean run,three;float dx,dy;double sx,sy;boolean drag,resizing;double initialWidth=1,initialHeight=1;
         SceneView(boolean r,boolean d){super(MainActivity.this);run=r;three=d;setBackgroundColor(bg);}
         @Override protected void onDraw(Canvas c){super.onDraw(c);c.drawColor(Color.rgb(20,33,51));if(run)tickRuntime();int sw=sceneWidth(),sh=sceneHeight();float scale=Math.min(getWidth()/(float)sw,getHeight()/(float)sh);if(scale<=0)return;c.save();c.translate((getWidth()-sw*scale)/2,(getHeight()-sh*scale)/2);c.scale(scale,scale);if(three)draw3(c);else draw2(c);c.restore();p.setColor(muted);p.setTextSize(18);c.drawText(run?(three?"CHẠY THỬ 3D":"CHẠY THỬ 2D"):(three?"3D VIEW":"2D SCENE"),12,24,p);if(run){p.setColor(Color.WHITE);p.setTextSize(20);String extraHud="";if(runtimeVars.containsKey("Gold"))extraHud+="   Gold: "+(int)Math.round(runtimeVars.getOrDefault("Gold",0d));if(runtimeVars.containsKey("Level"))extraHud+="   Level: "+(int)Math.round(runtimeVars.getOrDefault("Level",1d));c.drawText("Score: "+runtimeScore+"   Lives: "+runtimeLives+(findPlayer()!=null?"   HP: "+(int)Math.round(runtimeObjectHealthValue(findPlayer())):"")+extraHud,12,52,p);if(runtimeGameOver){p.setColor(Color.RED);p.setTextSize(38);c.drawText("GAME OVER",Math.max(12,getWidth()/2f-105),getHeight()/2f,p);}postInvalidateDelayed(40);}}
         void draw2(Canvas c){
@@ -1119,6 +1119,12 @@ public class MainActivity extends Activity {
                 }
                 c.restore();
                 p.setAlpha(255);
+                if(!run&&i==selected&&!type.equals("camera")&&!type.equals("light")){
+                    p.setColor(Color.WHITE);
+                    c.drawRect(x+drawW-10,y+drawH-10,x+drawW+10,y+drawH+10,p);
+                    p.setColor(accent);
+                    c.drawRect(x+drawW-6,y+drawH-6,x+drawW+6,y+drawH+6,p);
+                }
                 if(run&&(type.equals("enemy")||type.equals("player")))drawRuntimeHealthBar(c,o,x,y,drawW);
             }
             p.setAlpha(255);
@@ -1172,8 +1178,24 @@ public class MainActivity extends Activity {
                 float offsetX=(getWidth()-sceneWidth()*scale)/2f,offsetY=(getHeight()-sceneHeight()*scale)/2f;
                 double sceneX=(dx-offsetX)/scale,sceneY=(dy-offsetY)/scale;
                 int hit=-1;
+                // The selected object's resize handle gets priority over normal object picking.
+                if(selected>=0&&selected<a.length()){
+                    JSONObject current=a.optJSONObject(selected);
+                    if(current!=null&&current.optBoolean("visible",true)&&!current.optBoolean("locked",false)){
+                        String currentType=current.optString("type","");
+                        if(!currentType.equals("camera")&&!currentType.equals("light")){
+                            double cx=current.optDouble("x",0),cy=current.optDouble("y",0);
+                            double cw=current.optDouble("w",1),ch=current.optDouble("h",1);
+                            if(currentType.equals("platform")){cw=Math.max(40,cw);ch=Math.max(20,ch);}
+                            else if(!currentType.equals("coin")&&!currentType.equals("projectile")){cw=Math.max(34,cw);ch=Math.max(34,ch);}
+                            if(Math.abs(sceneX-(cx+cw))<=24&&Math.abs(sceneY-(cy+ch))<=24){
+                                hit=selected;resizing=true;initialWidth=current.optDouble("w",1);initialHeight=current.optDouble("h",1);
+                            }
+                        }
+                    }
+                }
                 // Later objects are drawn on top, so test them first.
-                for(int i=a.length()-1;i>=0;i--){
+                for(int i=a.length()-1;hit<0&&i>=0;i--){
                     JSONObject o=a.optJSONObject(i);if(o==null||!o.optBoolean("visible",true))continue;
                     String type=o.optString("type","");
                     double ox=o.optDouble("x",0),oy=o.optDouble("y",0);
@@ -1185,7 +1207,8 @@ public class MainActivity extends Activity {
                 if(hit<0){drag=false;invalidate();return true;}
                 selected=hit;
                 JSONObject o=a.optJSONObject(selected);
-                sx=o.optDouble("x");sy=o.optDouble("y");drag=!o.optBoolean("locked",false);
+                sx=o.optDouble("x");sy=o.optDouble("y");
+                if(!resizing)drag=!o.optBoolean("locked",false);
                 invalidate();return true;
             }
             if(e.getAction()==MotionEvent.ACTION_MOVE&&drag){
@@ -1194,16 +1217,24 @@ public class MainActivity extends Activity {
                 JSONObject o=a.optJSONObject(selected);
                 if(o==null){drag=false;return true;}
                 try{
-                    double width=Math.max(1,o.optDouble("w",1)),height=Math.max(1,o.optDouble("h",1));
-                    double nx=snapCoordinate(sx+(e.getX()-dx)/scale);
-                    double ny=snapCoordinate(sy+(e.getY()-dy)/scale);
-                    o.put("x",Math.max(0,Math.min(Math.max(0,sceneWidth()-width),nx)));
-                    o.put("y",Math.max(0,Math.min(Math.max(0,sceneHeight()-height),ny)));
+                    if(resizing){
+                        double nw=snapCoordinate(initialWidth+(e.getX()-dx)/scale);
+                        double nh=snapCoordinate(initialHeight+(e.getY()-dy)/scale);
+                        nw=Math.max(8,Math.min(sceneWidth()-o.optDouble("x"),nw));
+                        nh=Math.max(8,Math.min(sceneHeight()-o.optDouble("y"),nh));
+                        o.put("w",nw);o.put("h",nh);
+                    }else{
+                        double width=Math.max(1,o.optDouble("w",1)),height=Math.max(1,o.optDouble("h",1));
+                        double nx=snapCoordinate(sx+(e.getX()-dx)/scale);
+                        double ny=snapCoordinate(sy+(e.getY()-dy)/scale);
+                        o.put("x",Math.max(0,Math.min(Math.max(0,sceneWidth()-width),nx)));
+                        o.put("y",Math.max(0,Math.min(Math.max(0,sceneHeight()-height),ny)));
+                    }
                 }catch(Exception ignored){}
                 invalidate();return true;
             }
             if(e.getAction()==MotionEvent.ACTION_UP||e.getAction()==MotionEvent.ACTION_CANCEL){
-                if(drag)save();drag=false;invalidate();return true;
+                if(drag||resizing)save();drag=false;resizing=false;invalidate();return true;
             }
             return true;
         }
