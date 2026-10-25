@@ -989,9 +989,43 @@ public class MainActivity extends Activity {
             root.addView(eventControlScroll);
         }
         root.addView(btn("+ Thêm khối sự kiện",()->editEvent(-1)));
+        root.addView(btn("📚 Thư viện mẫu sự kiện",this::showEventTemplateLibrary));
         root.addView(label("Ví dụ: Score >= 10 nghĩa là điểm từ 10 trở lên. && yêu cầu cả hai điều kiện đúng; || chỉ cần một điều kiện đúng. Chọn “Khi điều kiện chuyển thành đúng” để chạy một lần khi điều kiện vừa đúng.",12,muted,false));
         root.addView(label("Lệnh nâng cao: spawn Projectile at Player 260 0; follow Enemy Player 100; set Enemy.VX = 80; teleport Enemy 400 200; rotate Player 15 (xoay thêm 15°); angle Player 90 (đặt góc 90°); opacity Enemy 128 (trong suốt một nửa); add Score 5; subtract Lives 1; hide Coin; show Enemy; respawn Player.",12,muted,false));
     }
+    void showEventTemplateLibrary(){
+        String[] groups={"Nền tảng 2D: khởi tạo người chơi","Nền tảng 2D: nhặt Coin","Nền tảng 2D: chạm Enemy mất mạng","Nền tảng 2D: rơi khỏi bản đồ hồi sinh","Bắn súng: bấm Bắn tạo đạn","Bắn súng: Projectile trúng Enemy","AI: Enemy đuổi theo Player","AI: Enemy dừng đuổi khi cần","Điểm số: đạt 10 điểm","Thời gian: tăng bộ đếm mỗi giây","RPG: khởi tạo máu và mạng","RPG: hồi máu khi nhặt vật phẩm","Điều khiển: di chuyển Player sang trái","Điều khiển: di chuyển Player sang phải","Ẩn/hiện: ẩn Coin khi bắt đầu","Ẩn/hiện: hiện Enemy khi bắt đầu"};
+        new AlertDialog.Builder(this).setTitle("Thư viện mẫu sự kiện")
+            .setItems(groups,(dialog,which)->{
+                String trigger="Khi bắt đầu cảnh",condition="",action="Đặt biến Score = 0",custom="";
+                switch(which){
+                    case 0: trigger="Khi bắt đầu cảnh";action="Đặt biến Lives = 3";custom="set Gravity = 950";break;
+                    case 1: trigger="Khi Player chạm Coin";action="Tăng Score thêm 1";custom="hide Coin";break;
+                    case 2: trigger="Khi Player chạm Enemy";action="Trừ 1 mạng";break;
+                    case 3: trigger="Khi Player rơi khỏi màn hình";action="Hồi sinh Player";break;
+                    case 4: trigger="Khi bấm nút Bắn";action="Bắn Projectile";custom="spawn Projectile at Player 260 0";break;
+                    case 5: trigger="Khi Projectile chạm Enemy";action="Trừ 25 máu Enemy vừa trúng";custom="destroy Enemy";break;
+                    case 6: trigger="Mỗi khung hình";action="Lệnh tùy chỉnh (xem ô bên dưới)";custom="follow Enemy Player 100";break;
+                    case 7: trigger="Khi bấm nút Bắn";action="Lệnh tùy chỉnh (xem ô bên dưới)";custom="stopfollow Enemy";break;
+                    case 8: trigger="Khi điều kiện chuyển thành đúng";condition="Score >= 10";action="Tăng Score thêm 10";break;
+                    case 9: trigger="Mỗi 1 giây";action="Lệnh tùy chỉnh (xem ô bên dưới)";custom="add Timer 1";break;
+                    case 10: trigger="Khi bắt đầu cảnh";action="Đặt biến Lives = 3";custom="set Player.Health = 100";break;
+                    case 11: trigger="Khi Player chạm Coin";action="Hồi 25 máu Player";custom="show HealthPack";break;
+                    case 12: trigger="Khi bấm nút Nhảy";action="Di chuyển Player sang trái";break;
+                    case 13: trigger="Khi bấm nút Nhảy";action="Di chuyển Player sang phải";break;
+                    case 14: trigger="Khi bắt đầu cảnh";action="Ẩn Coin";break;
+                    case 15: trigger="Khi bắt đầu cảnh";action="Hiện Enemy";break;
+                }
+                try{
+                    JSONArray events=project.optJSONArray("events");
+                    if(events==null){events=new JSONArray();project.put("events",events);}
+                    JSONObject event=new JSONObject();
+                    event.put("trigger",trigger);event.put("condition",condition);event.put("action",action);event.put("customAction",custom);
+                    events.put(event);save();editor();toast("Đã thêm mẫu sự kiện: "+groups[which]);
+                }catch(Exception ex){toast("Không thêm được mẫu sự kiện");}
+            }).setNegativeButton("Đóng",null).show();
+    }
+
     void moveEvent(int index,int offset){
         JSONArray list=project.optJSONArray("events");
         if(list==null){toast("Dự án chưa có khối sự kiện");return;}
