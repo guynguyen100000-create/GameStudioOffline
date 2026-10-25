@@ -559,13 +559,14 @@ public class MainActivity extends Activity {
         long now=System.currentTimeMillis();double dt=Math.min(.05,Math.max(.001,(now-lastRuntimeTick)/1000d));lastRuntimeTick=now;
         JSONObject player=findPlayer();
         executePhase("frame",null);
+        boolean playerActive=player!=null&&!hiddenRuntimeObjects.contains(player.optString("name",""))&&!destroyedRuntimeObjects.contains(player.optString("name",""));
         double pw=0,ph=0,oldBottom=runtimePlayerY;
-        if(player!=null){
+        if(playerActive){
             if(jumpRequested){executePhase("jump",null);if(runtimeGrounded){runtimePlayerVY=-runtimeJumpStrength;runtimeGrounded=false;}jumpRequested=false;}
             pw=Math.max(20,player.optDouble("w",48));ph=Math.max(20,player.optDouble("h",60));oldBottom=runtimePlayerY+ph;
         }else jumpRequested=false;
         dt*=runtimeTimeScale;
-        if(player!=null){
+        if(playerActive){
             runtimePlayerX=Math.max(0,Math.min(sceneWidth()-pw,runtimePlayerX+(moveAxis*runtimeMoveSpeed+runtimePlayerVX)*dt));
             runtimePlayerVY=Math.min(1200,runtimePlayerVY+runtimeGravity*dt);
             runtimePlayerY=Math.max(0,runtimePlayerY+runtimePlayerVY*dt);
@@ -1029,7 +1030,7 @@ public class MainActivity extends Activity {
             if(scale<=0)return true;
             if(e.getAction()==MotionEvent.ACTION_DOWN){
                 dx=e.getX();dy=e.getY();
-                if(run){jumpRequested=true;invalidate();return true;}
+                if(run){JSONObject player=findPlayer();if(!runtimeGameOver&&player!=null&&!hiddenRuntimeObjects.contains(player.optString("name",""))&&!destroyedRuntimeObjects.contains(player.optString("name","")))jumpRequested=true;invalidate();return true;}
                 JSONArray a=objects();
                 float offsetX=(getWidth()-sceneWidth()*scale)/2f,offsetY=(getHeight()-sceneHeight()*scale)/2f;
                 double sceneX=(dx-offsetX)/scale,sceneY=(dy-offsetY)/scale;
