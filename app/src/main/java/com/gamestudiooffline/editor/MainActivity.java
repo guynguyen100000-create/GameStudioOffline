@@ -236,6 +236,8 @@ public class MainActivity extends Activity {
     final Map<String,Double> runtimeObjectVX = new HashMap<>();
     final Map<String,Double> runtimeObjectVY = new HashMap<>();
     final Map<String,Double> runtimeObjectHealth = new HashMap<>();
+    final Map<String,Double> runtimeObjectAngle = new HashMap<>();
+    final Map<String,Double> runtimeObjectOpacity = new HashMap<>();
     final Map<String,Double> runtimeFollowSpeed = new HashMap<>();
     String lastObjectCollisionA="",lastObjectCollisionB="",lastObjectCollisionTypeA="",lastObjectCollisionTypeB="";
     final ArrayList<JSONObject> runtimeSpawnedObjects = new ArrayList<>();
@@ -257,7 +259,7 @@ public class MainActivity extends Activity {
         runtimeVars.clear();runtimeVars.put("Score",0d);runtimeVars.put("Lives",3d);runtimeVars.put("Timer",0d);
         JSONArray savedVars=project.optJSONArray("variables");
         if(savedVars!=null)for(int i=0;i<savedVars.length();i++){JSONObject v=savedVars.optJSONObject(i);if(v!=null){String n=v.optString("name","").trim();if(!n.isEmpty())putRuntimeVar(n,v.optDouble("value",0));}}
-        runtimeSpawnedObjects.clear();runtimeSpawnCounter=0;runtimeFollowSpeed.clear();lastObjectCollisionA="";lastObjectCollisionB="";lastObjectCollisionTypeA="";lastObjectCollisionTypeB="";runtimeObjectX.clear();runtimeObjectY.clear();runtimeObjectVX.clear();runtimeObjectVY.clear();runtimeObjectHealth.clear();JSONArray sceneObjects=objects();for(int i=0;i<sceneObjects.length();i++){JSONObject o=sceneObjects.optJSONObject(i);if(o!=null){String n=o.optString("name","");runtimeObjectX.put(n,o.optDouble("x",0));runtimeObjectY.put(n,o.optDouble("y",0));runtimeObjectVX.put(n,o.optDouble("vx",0));runtimeObjectVY.put(n,o.optDouble("vy",0));runtimeObjectHealth.put(n,o.optDouble("health",100));}}
+        runtimeSpawnedObjects.clear();runtimeSpawnCounter=0;runtimeFollowSpeed.clear();lastObjectCollisionA="";lastObjectCollisionB="";lastObjectCollisionTypeA="";lastObjectCollisionTypeB="";runtimeObjectX.clear();runtimeObjectY.clear();runtimeObjectVX.clear();runtimeObjectVY.clear();runtimeObjectHealth.clear();runtimeObjectAngle.clear();runtimeObjectOpacity.clear();JSONArray sceneObjects=objects();for(int i=0;i<sceneObjects.length();i++){JSONObject o=sceneObjects.optJSONObject(i);if(o!=null){String n=o.optString("name","");runtimeObjectX.put(n,o.optDouble("x",0));runtimeObjectY.put(n,o.optDouble("y",0));runtimeObjectVX.put(n,o.optDouble("vx",0));runtimeObjectVY.put(n,o.optDouble("vy",0));runtimeObjectHealth.put(n,o.optDouble("health",100));runtimeObjectAngle.put(n,o.optDouble("angle",0));runtimeObjectOpacity.put(n,o.optDouble("opacity",255));}}
         hiddenRuntimeObjects.clear();
         for(int i=0;i<sceneObjects.length();i++){JSONObject o=sceneObjects.optJSONObject(i);if(o!=null&&!o.optBoolean("visible",true))hiddenRuntimeObjects.add(o.optString("name",""));}
         destroyedRuntimeObjects.clear();previousContacts.clear();eventTimerLastFired.clear();eventConditionWasTrue.clear();
@@ -268,7 +270,7 @@ public class MainActivity extends Activity {
         lastRuntimeTick=System.currentTimeMillis();runtimeStartMillis=lastRuntimeTick;runtimeStarted=true;
         executePhase("start",null);
     }
-    void stopRuntime(){runtimeStarted=false;moveAxis=0;jumpRequested=false;hiddenRuntimeObjects.clear();destroyedRuntimeObjects.clear();previousContacts.clear();runtimeSpawnedObjects.clear();runtimeSpawnCounter=0;runtimeFollowSpeed.clear();runtimeObjectX.clear();runtimeObjectY.clear();runtimeObjectVX.clear();runtimeObjectVY.clear();runtimeObjectHealth.clear();}
+    void stopRuntime(){runtimeStarted=false;moveAxis=0;jumpRequested=false;hiddenRuntimeObjects.clear();destroyedRuntimeObjects.clear();previousContacts.clear();runtimeSpawnedObjects.clear();runtimeSpawnCounter=0;runtimeFollowSpeed.clear();runtimeObjectX.clear();runtimeObjectY.clear();runtimeObjectVX.clear();runtimeObjectVY.clear();runtimeObjectHealth.clear();runtimeObjectAngle.clear();runtimeObjectOpacity.clear();}
     JSONArray runtimeSceneObjects(){JSONArray all=new JSONArray();JSONArray base=objects();for(int i=0;i<base.length();i++){JSONObject o=base.optJSONObject(i);if(o!=null)all.put(o);}for(JSONObject o:runtimeSpawnedObjects)if(o!=null)all.put(o);return all;}
     boolean runtimeTargetMatches(JSONObject o,String query,JSONArray all){
         String q=query.trim().toLowerCase(Locale.ROOT),name=o.optString("name","").toLowerCase(Locale.ROOT),type=o.optString("type","").toLowerCase(Locale.ROOT);boolean exactNameExists=false;
@@ -276,7 +278,7 @@ public class MainActivity extends Activity {
         return exactNameExists?name.equals(q):(type.equals(q)||name.contains(q));
     }
     void cleanupRuntimeSpawns(){
-        java.util.Iterator<JSONObject> it=runtimeSpawnedObjects.iterator();while(it.hasNext()){JSONObject o=it.next();String n=o.optString("name","");double x=runtimeObjectCoordinate(o,true),y=runtimeObjectCoordinate(o,false);if(destroyedRuntimeObjects.contains(n)||x < -160||x > sceneWidth()+160||y < -160||y > sceneHeight()+160){it.remove();runtimeObjectX.remove(n);runtimeObjectY.remove(n);runtimeObjectVX.remove(n);runtimeObjectVY.remove(n);runtimeObjectHealth.remove(n);runtimeFollowSpeed.remove(n);hiddenRuntimeObjects.remove(n);destroyedRuntimeObjects.remove(n);previousContacts.remove(o.optString("type","")+":"+n);previousContacts.removeIf(k->k.contains(n));}}
+        java.util.Iterator<JSONObject> it=runtimeSpawnedObjects.iterator();while(it.hasNext()){JSONObject o=it.next();String n=o.optString("name","");double x=runtimeObjectCoordinate(o,true),y=runtimeObjectCoordinate(o,false);if(destroyedRuntimeObjects.contains(n)||x < -160||x > sceneWidth()+160||y < -160||y > sceneHeight()+160){it.remove();runtimeObjectX.remove(n);runtimeObjectY.remove(n);runtimeObjectVX.remove(n);runtimeObjectVY.remove(n);runtimeObjectHealth.remove(n);runtimeObjectAngle.remove(n);runtimeObjectOpacity.remove(n);runtimeFollowSpeed.remove(n);hiddenRuntimeObjects.remove(n);destroyedRuntimeObjects.remove(n);previousContacts.remove(o.optString("type","")+":"+n);previousContacts.removeIf(k->k.contains(n));}}
     }
     JSONObject findObject(String query){
         if(query==null)return null;String q=query.trim();JSONArray a=objects();
@@ -292,7 +294,7 @@ public class MainActivity extends Activity {
         for(int i=0;i<base.length();i++){JSONObject o=base.optJSONObject(i);if(o!=null&&o.optString("name","").equalsIgnoreCase(q)){template=o;break;}}
         if(template==null)for(int i=0;i<base.length();i++){JSONObject o=base.optJSONObject(i);if(o!=null&&o.optString("type","").equalsIgnoreCase(q)){template=o;break;}}
         if(template==null||isPlayerObject(template)){toast("Không tìm thấy mẫu phù hợp để tạo: "+q);return;}
-        try{JSONObject instance=new JSONObject(template.toString());String baseName=template.optString("name",q).replaceAll("\\s+","_");String instanceName="Spawned_"+baseName+"_"+(++runtimeSpawnCounter);instance.put("name",instanceName);instance.put("x",x);instance.put("y",y);instance.put("vx",Double.isNaN(vx)?template.optDouble("vx",0):vx);instance.put("vy",Double.isNaN(vy)?template.optDouble("vy",0):vy);runtimeSpawnedObjects.add(instance);if(!instance.optBoolean("visible",true))hiddenRuntimeObjects.add(instanceName);runtimeObjectX.put(instanceName,x);runtimeObjectY.put(instanceName,y);runtimeObjectVX.put(instanceName,instance.optDouble("vx",0));runtimeObjectVY.put(instanceName,instance.optDouble("vy",0));runtimeObjectHealth.put(instanceName,instance.optDouble("health",100));}
+        try{JSONObject instance=new JSONObject(template.toString());String baseName=template.optString("name",q).replaceAll("\\s+","_");String instanceName="Spawned_"+baseName+"_"+(++runtimeSpawnCounter);instance.put("name",instanceName);instance.put("x",x);instance.put("y",y);instance.put("vx",Double.isNaN(vx)?template.optDouble("vx",0):vx);instance.put("vy",Double.isNaN(vy)?template.optDouble("vy",0):vy);runtimeSpawnedObjects.add(instance);if(!instance.optBoolean("visible",true))hiddenRuntimeObjects.add(instanceName);runtimeObjectX.put(instanceName,x);runtimeObjectY.put(instanceName,y);runtimeObjectVX.put(instanceName,instance.optDouble("vx",0));runtimeObjectVY.put(instanceName,instance.optDouble("vy",0));runtimeObjectHealth.put(instanceName,instance.optDouble("health",100));runtimeObjectAngle.put(instanceName,instance.optDouble("angle",0));runtimeObjectOpacity.put(instanceName,instance.optDouble("opacity",255));}
         catch(Exception e){toast("Không tạo được đối tượng runtime");}
     }
     String resolveLastHitTarget(String target){if(target==null)return "";if(target.equalsIgnoreCase("HitA"))return lastObjectCollisionA;if(target.equalsIgnoreCase("HitB"))return lastObjectCollisionB;if(target.equalsIgnoreCase("LastHitEnemy")){if(lastObjectCollisionTypeA.equalsIgnoreCase("enemy"))return lastObjectCollisionA;if(lastObjectCollisionTypeB.equalsIgnoreCase("enemy"))return lastObjectCollisionB;return target;}if(target.equalsIgnoreCase("LastHitProjectile")){if(lastObjectCollisionTypeA.equalsIgnoreCase("projectile"))return lastObjectCollisionA;if(lastObjectCollisionTypeB.equalsIgnoreCase("projectile"))return lastObjectCollisionB;return target;}return target;}
@@ -312,6 +314,10 @@ public class MainActivity extends Activity {
     void setObjectVelocity(String query,boolean xAxis,double value){JSONObject o=findObject(query);if(o==null)return;if(isPlayerObject(o)){if(xAxis)runtimePlayerVX=value;else runtimePlayerVY=value;return;}(xAxis?runtimeObjectVX:runtimeObjectVY).put(o.optString("name",""),value);}
     double runtimeObjectHealthValue(JSONObject o){if(o==null)return 0;return runtimeObjectHealth.getOrDefault(o.optString("name",""),o.optDouble("health",100));}
     void setObjectHealth(String query,double value){JSONObject o=findObject(query);if(o!=null){double max=Math.max(0,o.optDouble("health",100));runtimeObjectHealth.put(o.optString("name",""),Math.max(0,Math.min(max,value)));}}
+    double runtimeObjectAngleValue(JSONObject o){return o==null?0:runtimeObjectAngle.getOrDefault(o.optString("name",""),o.optDouble("angle",0));}
+    void setObjectAngle(String query,double angle){JSONObject o=findObject(resolveLastHitTarget(query));if(o!=null&&finiteNumber(angle))runtimeObjectAngle.put(o.optString("name",""),angle);}
+    double runtimeObjectOpacityValue(JSONObject o){return o==null?255:runtimeObjectOpacity.getOrDefault(o.optString("name",""),o.optDouble("opacity",255));}
+    void setObjectOpacity(String query,double opacity){JSONObject o=findObject(resolveLastHitTarget(query));if(o!=null&&finiteNumber(opacity))runtimeObjectOpacity.put(o.optString("name",""),Math.max(0,Math.min(255,opacity)));}
     JSONObject findPlayer(){
         JSONArray a=objects();for(int i=0;i<a.length();i++){JSONObject o=a.optJSONObject(i);if(o!=null&&(o.optString("type").equalsIgnoreCase("player")||o.optString("name").equalsIgnoreCase("player")))return o;}return null;
     }
@@ -490,6 +496,9 @@ public class MainActivity extends Activity {
         Matcher customAdd=Pattern.compile("(?i)^add\\s+([A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)?)\\s+(.+)$").matcher(command);
         Matcher customSub=Pattern.compile("(?i)^subtract\\s+([A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)?)\\s+(.+)$").matcher(command);
         Matcher teleport=Pattern.compile("(?i)^teleport\\s+([A-Za-z_][A-Za-z0-9_]*)\\s+(-?\\d+(?:\\.\\d+)?)\\s+(-?\\d+(?:\\.\\d+)?)$").matcher(command);
+        Matcher rotate=Pattern.compile("(?i)^rotate\\s+(.+?)\\s+(-?\\d+(?:\\.\\d+)?)$").matcher(command);
+        Matcher setAngle=Pattern.compile("(?i)^(?:angle|setangle)\\s+(.+?)\\s+(-?\\d+(?:\\.\\d+)?)$").matcher(command);
+        Matcher opacity=Pattern.compile("(?i)^opacity\\s+(.+?)\\s+(-?\\d+(?:\\.\\d+)?)$").matcher(command);
         Matcher spawnAtPlayer=Pattern.compile("(?i)^spawn\\s+([A-Za-z_][A-Za-z0-9_]*)\\s+at\\s+player(?:\\s+(-?\\d+(?:\\.\\d+)?)\\s+(-?\\d+(?:\\.\\d+)?))?$").matcher(command);
         Matcher spawn=Pattern.compile("(?i)^spawn\\s+([A-Za-z_][A-Za-z0-9_]*)\\s+(-?\\d+(?:\\.\\d+)?)\\s+(-?\\d+(?:\\.\\d+)?)(?:\\s+(-?\\d+(?:\\.\\d+)?)\\s+(-?\\d+(?:\\.\\d+)?))?$").matcher(command);
         Matcher follow=Pattern.compile("(?i)^follow\\s+([A-Za-z_][A-Za-z0-9_]*)\\s+player\\s+(\\d+(?:\\.\\d+)?)$").matcher(command);
@@ -513,6 +522,9 @@ public class MainActivity extends Activity {
             return;
         }
         if(teleport.matches()){teleportObject(teleport.group(1),Double.parseDouble(teleport.group(2)),Double.parseDouble(teleport.group(3)));updateHudValues();return;}
+        if(rotate.matches()){JSONObject target=findObject(resolveLastHitTarget(rotate.group(1)));if(target!=null)setObjectAngle(target.optString("name",""),runtimeObjectAngleValue(target)+Double.parseDouble(rotate.group(2)));updateHudValues();return;}
+        if(setAngle.matches()){setObjectAngle(setAngle.group(1),Double.parseDouble(setAngle.group(2)));updateHudValues();return;}
+        if(opacity.matches()){setObjectOpacity(opacity.group(1),Double.parseDouble(opacity.group(2)));updateHudValues();return;}
         if(spawnAtPlayer.matches()){double vx=spawnAtPlayer.group(2)==null?Double.NaN:Double.parseDouble(spawnAtPlayer.group(2));double vy=spawnAtPlayer.group(3)==null?Double.NaN:Double.parseDouble(spawnAtPlayer.group(3));JSONObject p=findPlayer(),t=findObject(spawnAtPlayer.group(1));double spawnX=runtimePlayerX,spawnY=runtimePlayerY;if(p!=null&&t!=null){double pw=Math.max(1,p.optDouble("w",48)),ph=Math.max(1,p.optDouble("h",60)),tw=Math.max(1,t.optDouble("w",20)),th=Math.max(1,t.optDouble("h",20));spawnX=runtimePlayerX+(vx<0?-tw:pw);spawnY=runtimePlayerY+(ph-th)/2;}spawnRuntimeObject(spawnAtPlayer.group(1),spawnX,spawnY,vx,vy);updateHudValues();return;}
         if(spawn.matches()){double vx=spawn.group(4)==null?Double.NaN:Double.parseDouble(spawn.group(4));double vy=spawn.group(5)==null?Double.NaN:Double.parseDouble(spawn.group(5));spawnRuntimeObject(spawn.group(1),Double.parseDouble(spawn.group(2)),Double.parseDouble(spawn.group(3)),vx,vy);updateHudValues();return;}
         if(follow.matches()){JSONObject target=findObject(follow.group(1));if(target!=null&&!isPlayerObject(target))runtimeFollowSpeed.put(target.optString("name",""),Double.parseDouble(follow.group(2)));updateHudValues();return;}
@@ -957,7 +969,7 @@ public class MainActivity extends Activity {
         }
         root.addView(btn("+ Thêm khối sự kiện",()->editEvent(-1)));
         root.addView(label("Ví dụ: Score >= 10 nghĩa là điểm từ 10 trở lên. && yêu cầu cả hai điều kiện đúng; || chỉ cần một điều kiện đúng. Chọn “Khi điều kiện chuyển thành đúng” để chạy một lần khi điều kiện vừa đúng.",12,muted,false));
-        root.addView(label("Lệnh nâng cao (tùy chọn): spawn Projectile at Player 260 0; follow Enemy Player 100; set Enemy.VX = 80; teleport Enemy 400 200; add Score 5; subtract Lives 1; hide Coin; show Enemy; respawn Player.",12,muted,false));
+        root.addView(label("Lệnh nâng cao: spawn Projectile at Player 260 0; follow Enemy Player 100; set Enemy.VX = 80; teleport Enemy 400 200; rotate Player 15 (xoay thêm 15°); angle Player 90 (đặt góc 90°); opacity Enemy 128 (trong suốt một nửa); add Score 5; subtract Lives 1; hide Coin; show Enemy; respawn Player.",12,muted,false));
     }
     void moveEvent(int index,int offset){
         JSONArray list=project.optJSONArray("events");
@@ -1060,8 +1072,8 @@ public class MainActivity extends Activity {
                 float drawH=Math.max(type.equals("platform")?20:1,h);
                 if(!type.equals("coin")&&!type.equals("projectile")&&!type.equals("platform")){drawW=Math.max(34,w);drawH=Math.max(34,h);}
                 c.save();
-                c.rotate((float)o.optDouble("angle",0),x+drawW/2f,y+drawH/2f);
-                p.setAlpha(Math.max(0,Math.min(255,o.optInt("opacity",255))));
+                c.rotate((float)(run?runtimeObjectAngleValue(o):o.optDouble("angle",0)),x+drawW/2f,y+drawH/2f);
+                p.setAlpha((int)Math.max(0,Math.min(255,Math.round(run?runtimeObjectOpacityValue(o):o.optDouble("opacity",255)))));
                 p.setColor(o.optInt("color",Color.WHITE));
                 Bitmap sprite=loadSprite(o.optString("image",""));
                 if(sprite!=null){
@@ -1109,8 +1121,8 @@ public class MainActivity extends Activity {
                 float x=sw/2f+(rawX-sw/2f)*.72f-(rawY-sh/2f)*.35f;
                 float y=sh/2f+10+(rawY-sh/2f)*.48f+(x-sw/2f)*.18f;
                 c.save();
-                c.rotate((float)o.optDouble("angle",0),x,y);
-                p.setAlpha(Math.max(0,Math.min(255,o.optInt("opacity",255))));
+                c.rotate((float)(run?runtimeObjectAngleValue(o):o.optDouble("angle",0)),x,y);
+                p.setAlpha((int)Math.max(0,Math.min(255,Math.round(run?runtimeObjectOpacityValue(o):o.optDouble("opacity",255)))));
                 p.setColor(o.optInt("color",Color.BLUE));
                 if(type.equals("camera")||type.equals("light")){
                     p.setTextSize(22);
