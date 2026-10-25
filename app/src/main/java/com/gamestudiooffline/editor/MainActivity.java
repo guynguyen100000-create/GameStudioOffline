@@ -20,6 +20,10 @@ public class MainActivity extends Activity {
     int fg=Color.rgb(239,244,255), muted=Color.rgb(160,178,204);
     JSONObject project; File activeFile; String tab="2D"; boolean preview=false; EditText nameBox;
     boolean snapToGrid=true; int snapGridSize=20;
+    final ArrayDeque<String> undoHistory=new ArrayDeque<>();
+    final ArrayDeque<String> redoHistory=new ArrayDeque<>();
+    String lastSavedSnapshot=null;
+    static final int HISTORY_LIMIT=40;
     static final int EXPORT_ZIP=7, IMPORT_PROJECT=8, IMPORT_IMAGE=9;
     final Map<String,Bitmap> spriteCache=new HashMap<>();
 
@@ -124,7 +128,7 @@ public class MainActivity extends Activity {
             project=loaded;
         }
         activeFile=new File(dir(),safe(project.optString("name","Imported"))+".gsproj");
-        save();spriteCache.clear();tab=project.optString("dimension","2D");preview=false;selected=0;editor();toast("Đã nhập dự án và tài nguyên (nếu có)");
+        resetProjectHistory();save();spriteCache.clear();tab=project.optString("dimension","2D");preview=false;selected=0;editor();toast("Đã nhập dự án và tài nguyên (nếu có)");
     }
     LinearLayout col(){LinearLayout l=new LinearLayout(this);l.setOrientation(LinearLayout.VERTICAL);l.setPadding(dp(12),dp(8),dp(12),dp(12));l.setBackgroundColor(bg);return l;}
     LinearLayout row(){LinearLayout l=new LinearLayout(this);l.setOrientation(LinearLayout.HORIZONTAL);l.setGravity(Gravity.CENTER_VERTICAL);return l;}
@@ -166,7 +170,7 @@ public class MainActivity extends Activity {
             JSONArray vars=new JSONArray();vars.put(variable("Score",0));vars.put(variable("Lives",3));vars.put(variable("Timer",0));project.put("variables",vars);
             JSONArray ev=new JSONArray();ev.put(event("Khi bắt đầu cảnh","Đặt biến Score = 0"));
             ev.put(event(dimension.equals("2D")?"Khi Player chạm Coin":"Khi bắt đầu cảnh",dimension.equals("2D")?"Tăng Score thêm 1 và ẩn Coin":"Đặt Camera nhìn vào Cube"));project.put("events",ev);
-            activeFile=new File(dir(),safe(n)+".gsproj");tab=dimension;save();selected=0;editor();
+            activeFile=new File(dir(),safe(n)+".gsproj");tab=dimension;resetProjectHistory();save();selected=0;editor();
         }catch(Exception e){toast("Lỗi tạo dự án: "+e.getMessage());}
     }
 
@@ -222,7 +226,7 @@ public class MainActivity extends Activity {
                 ev.put(templateEvent("Khi điều kiện chuyển thành đúng","Lệnh tùy chỉnh (xem ô bên dưới)","add Level 1","Score >= Level * 10"));
             }
             project.put("events",ev);
-            activeFile=new File(dir(),safe(n)+".gsproj");tab="2D";preview=false;selected=0;save();editor();
+            activeFile=new File(dir(),safe(n)+".gsproj");tab="2D";preview=false;selected=0;resetProjectHistory();save();editor();
             toast(shooter?"Đã tạo mẫu Bắn súng 2D":tower?"Đã tạo mẫu Tower Defense":"Đã tạo mẫu RPG sinh tồn");
         }catch(Exception e){toast("Không tạo được mẫu game: "+e.getMessage());}
     }
@@ -655,8 +659,59 @@ public class MainActivity extends Activity {
         return b;
     }
     JSONObject read(File f)throws Exception{ByteArrayOutputStream b=new ByteArrayOutputStream();try(InputStream in=new FileInputStream(f)){byte[] buf=new byte[4096];int n;while((n=in.read(buf))>0)b.write(buf,0,n);}return new JSONObject(b.toString("UTF-8"));}
-    void open(File f){try{project=read(f);activeFile=f;tab=project.optString("dimension","2D");preview=false;selected=0;editor();}catch(Exception e){toast("Không mở được dự án");}}
-    void save(){try(FileOutputStream out=new FileOutputStream(activeFile)){out.write(project.toString(2).getBytes(StandardCharsets.UTF_8));}catch(Exception e){toast("Lỗi lưu");}}
+    void open(File f){try{project=read(f);activeFile=f;resetProjectHistory();tab=project.optString("dimension","2D");preview=false;selected=0;editor();}catch(Exception e){toast("Không mở được dự án");}}
+    void resetProjectHistory(){
+        undoHistory.clear();redoHistory.clear();
+        lastSavedSnapshot=project==null?null:project.toString();
+    }
+    void pushHistory(ArrayDeque<String> history,String snapshot){
+        if(snapshot==null)return;
+        history.addLast(snapshot);
+        while(history.size()>HISTORY_LIMIT)history.removeFirst();
+    }
+    boolean writeProjectSnapshot(JSONObject snapshot){
+        if(snapshot==null||activeFile==null)return false;
+        try(FileOutputStream out=new FileOutputStream(activeFile)){
+            out.write(snapshot.toString(2).getBytes(StandardCharsets.UTF_8));
+            return true;
+        }catch(Exception e){toast("Không ghi được bản thay đổi vào tệp dự án");return false;}
+    }
+    void save(){
+        if(project==null||activeFile==null)return;
+        String current=project.toString();
+        try(FileOutputStream out=new FileOutputStream(activeFile)){
+            out.write(project.toString(2).getBytes(StandardCharsets.UTF_8));
+            if(lastSavedSnapshot!=null&&!lastSavedSnapshot.equals(current)){
+                pushHistory(undoHistory,lastSavedSnapshot);
+                redoHistory.clear();
+            }
+            lastSavedSnapshot=current;
+        }catch(Exception e){toast("Lỗi lưu");}
+    }
+    void undoProject(){
+        if(project==null||undoHistory.isEmpty()){toast("Không còn thay đổi để hoàn tác");return;}
+        String target=undoHistory.peekLast();
+        try{
+            JSONObject restored=new JSONObject(target);
+            if(!writeProjectSnapshot(restored))return;
+            undoHistory.removeLast();pushHistory(redoHistory,project.toString());
+            project=restored;lastSavedSnapshot=project.toString();spriteCache.clear();
+            selected=Math.max(0,Math.min(selected,Math.max(0,objects().length()-1)));
+            editor();toast("Đã hoàn tác");
+        }catch(Exception e){toast("Không thể hoàn tác bản thay đổi này");}
+    }
+    void redoProject(){
+        if(project==null||redoHistory.isEmpty()){toast("Không còn thay đổi để làm lại");return;}
+        String target=redoHistory.peekLast();
+        try{
+            JSONObject restored=new JSONObject(target);
+            if(!writeProjectSnapshot(restored))return;
+            redoHistory.removeLast();pushHistory(undoHistory,project.toString());
+            project=restored;lastSavedSnapshot=project.toString();spriteCache.clear();
+            selected=Math.max(0,Math.min(selected,Math.max(0,objects().length()-1)));
+            editor();toast("Đã làm lại");
+        }catch(Exception e){toast("Không thể làm lại bản thay đổi này");}
+    }
     void validateProject(){
         ArrayList<String> errors=new ArrayList<>(),warnings=new ArrayList<>();
         if(project==null){toast("Chưa mở dự án");return;}
@@ -784,6 +839,10 @@ public class MainActivity extends Activity {
         top.addView(label(project.optString("name","Game"),16,fg,true),new LinearLayout.LayoutParams(0,-2,1));
         top.addView(btn("Lưu",()->{save();toast("Đã lưu ngoại tuyến");}));
         top.addView(btn(preview?"Dừng":"Chạy",()->{if(!preview)startRuntime();else stopRuntime();preview=!preview;editor();}));root.addView(top);
+        LinearLayout history=row();
+        Button undo=btn("↶ Hoàn tác "+undoHistory.size(),this::undoProject);undo.setEnabled(!undoHistory.isEmpty());history.addView(undo);
+        Button redo=btn("↷ Làm lại "+redoHistory.size(),this::redoProject);redo.setEnabled(!redoHistory.isEmpty());history.addView(redo);
+        root.addView(history);
         LinearLayout tabs=row();for(String t:new String[]{"2D","3D","Đối tượng","Sự kiện","Biến"})tabs.addView(btn(t,()->{tab=t;editor();}));root.addView(scroll(tabs));
         root.addView(btn("✓ Kiểm tra dự án",this::validateProject));
         if(preview){
