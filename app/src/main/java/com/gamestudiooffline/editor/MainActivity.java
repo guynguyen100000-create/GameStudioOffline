@@ -762,7 +762,7 @@ public class MainActivity extends Activity {
         root.addView(label("Đối tượng trong cảnh",18,fg,true));
         root.addView(label("Lớp 1 nằm phía sau; số lớp lớn hơn sẽ được vẽ phía trước.",12,muted,false));
         JSONArray a=objects();
-        for(int i=0;i<a.length();i++){int idx=i;JSONObject o=a.optJSONObject(i);if(o==null)continue;TextView t=card((i==selected?"● ":"○ ")+o.optString("name")+"  •  "+o.optString("type")+"\nLớp "+(i+1)+"/"+a.length()+" • "+(o.optBoolean("visible",true)?"Đang hiện":"Đang ẩn")+" • "+(objectCollisionEnabled(o)?"Va chạm bật":"Va chạm tắt")+"\nX="+(int)o.optDouble("x")+"  Y="+(int)o.optDouble("y")+"\nVX="+o.optDouble("vx",0)+"  VY="+o.optDouble("vy",0)+"  HP="+o.optDouble("health",100));root.addView(t);t.setOnClickListener(v->{selected=idx;editor();});}
+        for(int i=0;i<a.length();i++){int idx=i;JSONObject o=a.optJSONObject(i);if(o==null)continue;TextView t=card((i==selected?"● ":"○ ")+o.optString("name")+"  •  "+o.optString("type")+"\nLớp "+(i+1)+"/"+a.length()+" • "+(o.optBoolean("visible",true)?"Đang hiện":"Đang ẩn")+" • "+(o.optBoolean("locked",false)?"Đã khóa":"Có thể kéo")+" • "+(objectCollisionEnabled(o)?"Va chạm bật":"Va chạm tắt")+"\nX="+(int)o.optDouble("x")+"  Y="+(int)o.optDouble("y")+"\nVX="+o.optDouble("vx",0)+"  VY="+o.optDouble("vy",0)+"  HP="+o.optDouble("health",100));root.addView(t);t.setOnClickListener(v->{selected=idx;editor();});}
         root.addView(btn("+ Thêm đối tượng",()->new AlertDialog.Builder(this).setTitle("Loại đối tượng").setItems(new String[]{"Nhân vật","Enemy","Khối 3D","Coin","Nền sàn","Đạn (Projectile)"},(d,w)->{if(w==0)add("Player","player",Color.BLUE);if(w==1)add("Enemy","enemy",Color.RED);if(w==2)add("Cube","cube",Color.rgb(110,130,255));if(w==3)add("Coin","coin",Color.YELLOW);if(w==4)add("Platform","platform",Color.GREEN);if(w==5)add("Projectile","projectile",Color.YELLOW);}).show()));
         LinearLayout layerButtons=row();
         layerButtons.addView(btn("↑ Lên trước",()->moveSelectedLayer(1)));
@@ -770,12 +770,27 @@ public class MainActivity extends Activity {
         root.addView(layerButtons);
         root.addView(btn("Gán ảnh từ thư viện",this::importImage));
         root.addView(btn("Ẩn/Hiện đối tượng đã chọn",this::toggleSelectedVisibility));
+        root.addView(btn("Khóa/Mở khóa kéo thả",this::toggleSelectedLock));
         root.addView(btn("Sửa thuộc tính",this::editObject));
         root.addView(btn("Nhân bản đối tượng",this::duplicateSelected));
         root.addView(btn("Xóa đối tượng",()->{if(objects().length()>0){objects().remove(selected);selected=Math.max(0,selected-1);save();editor();}}));
     }
     EditText field(String s){EditText e=new EditText(this);e.setSingleLine(true);e.setText(s);e.setTextColor(fg);e.setBackgroundColor(panel);return e;}
     boolean objectCollisionEnabled(JSONObject o){return o!=null&&o.optBoolean("collisionEnabled",true);}
+
+    void toggleSelectedLock(){
+        JSONArray a=objects();
+        if(a.length()==0){toast("Chưa có đối tượng trong cảnh");return;}
+        selected=Math.max(0,Math.min(selected,a.length()-1));
+        JSONObject o=a.optJSONObject(selected);
+        if(o==null)return;
+        try{
+            boolean locked=!o.optBoolean("locked",false);
+            o.put("locked",locked);
+            save();editor();
+            toast(locked?"Đã khóa vị trí đối tượng":"Đã mở khóa đối tượng");
+        }catch(Exception ex){toast("Không đổi được trạng thái khóa");}
+    }
 
     void toggleSelectedVisibility(){
         JSONArray a=objects();
@@ -1138,7 +1153,7 @@ public class MainActivity extends Activity {
                 if(hit<0){drag=false;invalidate();return true;}
                 selected=hit;
                 JSONObject o=a.optJSONObject(selected);
-                sx=o.optDouble("x");sy=o.optDouble("y");drag=true;
+                sx=o.optDouble("x");sy=o.optDouble("y");drag=!o.optBoolean("locked",false);
                 invalidate();return true;
             }
             if(e.getAction()==MotionEvent.ACTION_MOVE&&drag){
