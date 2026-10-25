@@ -227,7 +227,7 @@ public class MainActivity extends Activity {
         }catch(Exception e){toast("Không tạo được mẫu game: "+e.getMessage());}
     }
     int selected=0;
-    final String[] triggerChoices={"Khi bắt đầu cảnh","Mỗi khung hình","Mỗi 0.5 giây","Mỗi 1 giây","Mỗi 2 giây","Mỗi 3 giây","Mỗi 5 giây","Mỗi 10 giây","Khi Player chạm Coin","Khi Player chạm Enemy","Khi Player chạm Cube","Khi Player chạm Platform","Khi Player chạm bất kỳ đối tượng nào","Khi Projectile chạm Enemy","Khi Enemy chạm Coin","Khi hai đối tượng chạm nhau","Khi bấm nút Nhảy","Khi bấm nút Bắn","Khi điều kiện chuyển thành đúng","Trong khi điều kiện đúng","Khi Player rơi khỏi màn hình"};
+    final String[] triggerChoices={"Khi bắt đầu cảnh","Mỗi khung hình","Mỗi 0.5 giây","Mỗi 1 giây","Mỗi 2 giây","Mỗi 3 giây","Mỗi 5 giây","Mỗi 10 giây","Khi Player chạm Coin","Khi Player chạm Enemy","Khi Player chạm Cube","Khi Player chạm Platform","Khi Player chạm bất kỳ đối tượng nào","Khi Projectile chạm Enemy","Khi Enemy chạm Coin","Khi hai đối tượng chạm nhau","Khi bấm nút Trái","Khi bấm nút Phải","Trong khi giữ nút Trái","Trong khi giữ nút Phải","Khi bấm nút Nhảy","Khi bấm nút Bắn","Khi điều kiện chuyển thành đúng","Trong khi điều kiện đúng","Khi Player rơi khỏi màn hình"};
     final String[] actionChoices={"Đặt biến Score = 0","Tăng Score thêm 1","Tăng Score thêm 10","Giảm Score đi 1","Đặt biến Lives = 3","Tăng Lives thêm 1","Ẩn Coin","Hiện Coin","Ẩn Enemy","Hiện Enemy","Ẩn Player","Hiện Player","Ẩn Projectile","Hiện Projectile","Ẩn Cube","Hiện Cube","Ẩn Platform","Hiện Platform","Bật va chạm Enemy","Tắt va chạm Enemy","Bật va chạm Player","Tắt va chạm Player","Bật va chạm Coin","Tắt va chạm Coin","Bật va chạm Projectile","Tắt va chạm Projectile","Bật va chạm Cube","Tắt va chạm Cube","Bật va chạm Platform","Tắt va chạm Platform","Cho Player nhảy","Trừ 1 mạng","Di chuyển Player","Di chuyển Player sang trái","Di chuyển Player sang phải","Hồi sinh Player","Đặt Gravity = 950","Đặt MoveSpeed = 240","Đặt JumpStrength = 430","Cho Enemy tự đi sang phải","Cho Enemy tự đi sang trái","Dừng Enemy","Cho Enemy đuổi theo Player","Dừng Enemy đuổi theo Player","Bắn Projectile","Trừ 10 máu Player","Trừ 25 máu Enemy","Trừ 25 máu Enemy vừa trúng","Hủy Projectile vừa trúng","Loại bỏ Enemy vừa trúng","Hồi 25 máu Player","Đưa Player về điểm xuất phát","Lệnh tùy chỉnh (xem ô bên dưới)"};
     // Runtime state is separate from editor data; play-testing never changes saved object positions.
     final Map<String,Double> runtimeVars = new HashMap<>();
@@ -253,6 +253,7 @@ public class MainActivity extends Activity {
     double runtimeSpawnX=120, runtimeSpawnY=350;
     double runtimeGravity=950, runtimeMoveSpeed=240, runtimeJumpStrength=430, runtimeTimeScale=1;
     float moveAxis=0;
+    boolean leftButtonHeld=false,rightButtonHeld=false;
     boolean runtimeGrounded=false, jumpRequested=false, runtimeStarted=false, runtimeGameOver=false;
     int runtimeScore=0, runtimeLives=3;
     long lastRuntimeTick=0, runtimeStartMillis=0;
@@ -267,13 +268,13 @@ public class MainActivity extends Activity {
         for(int i=0;i<sceneObjects.length();i++){JSONObject o=sceneObjects.optJSONObject(i);if(o!=null&&!o.optBoolean("visible",true))hiddenRuntimeObjects.add(o.optString("name",""));}
         destroyedRuntimeObjects.clear();previousContacts.clear();eventTimerLastFired.clear();eventConditionWasTrue.clear();
         runtimeGameOver=false;runtimeScore=0;runtimeLives=3;runtimeGravity=950;runtimeMoveSpeed=240;runtimeJumpStrength=430;runtimeTimeScale=1;
-        runtimePlayerVX=0;runtimePlayerVY=0;moveAxis=0;jumpRequested=false;runtimeGrounded=false;
+        runtimePlayerVX=0;runtimePlayerVY=0;moveAxis=0;leftButtonHeld=false;rightButtonHeld=false;jumpRequested=false;runtimeGrounded=false;
         JSONObject player=findPlayer();if(player!=null){runtimePlayerX=player.optDouble("x",120);runtimePlayerY=player.optDouble("y",350);runtimePlayerVX=player.optDouble("vx",0);}
         runtimeSpawnX=runtimePlayerX;runtimeSpawnY=runtimePlayerY;
         lastRuntimeTick=System.currentTimeMillis();runtimeStartMillis=lastRuntimeTick;runtimeStarted=true;
         executePhase("start",null);
     }
-    void stopRuntime(){runtimeStarted=false;moveAxis=0;jumpRequested=false;hiddenRuntimeObjects.clear();destroyedRuntimeObjects.clear();previousContacts.clear();runtimeSpawnedObjects.clear();runtimeSpawnCounter=0;runtimeFollowSpeed.clear();runtimeObjectX.clear();runtimeObjectY.clear();runtimeObjectVX.clear();runtimeObjectVY.clear();runtimeObjectHealth.clear();runtimeObjectAngle.clear();runtimeObjectOpacity.clear();runtimeCollisionOverrides.clear();}
+    void stopRuntime(){runtimeStarted=false;moveAxis=0;leftButtonHeld=false;rightButtonHeld=false;jumpRequested=false;hiddenRuntimeObjects.clear();destroyedRuntimeObjects.clear();previousContacts.clear();runtimeSpawnedObjects.clear();runtimeSpawnCounter=0;runtimeFollowSpeed.clear();runtimeObjectX.clear();runtimeObjectY.clear();runtimeObjectVX.clear();runtimeObjectVY.clear();runtimeObjectHealth.clear();runtimeObjectAngle.clear();runtimeObjectOpacity.clear();runtimeCollisionOverrides.clear();}
     JSONArray runtimeSceneObjects(){JSONArray all=new JSONArray();JSONArray base=objects();for(int i=0;i<base.length();i++){JSONObject o=base.optJSONObject(i);if(o!=null)all.put(o);}for(JSONObject o:runtimeSpawnedObjects)if(o!=null)all.put(o);return all;}
     boolean runtimeTargetMatches(JSONObject o,String query,JSONArray all){
         String q=query.trim().toLowerCase(Locale.ROOT),name=o.optString("name","").toLowerCase(Locale.ROOT),type=o.optString("type","").toLowerCase(Locale.ROOT);boolean exactNameExists=false;
@@ -337,6 +338,8 @@ public class MainActivity extends Activity {
             if("start".equals(phase))match=trigger.contains("bắt đầu cảnh");
             else if("frame".equals(phase)){
                 if(trigger.contains("mỗi khung hình")||trigger.contains("mỗi frame"))match=true;
+                else if(trigger.contains("trong khi giữ nút trái"))match=leftButtonHeld;
+                else if(trigger.contains("trong khi giữ nút phải"))match=rightButtonHeld;
                 else if(trigger.contains("trong khi điều kiện đúng"))match=!condition.isEmpty()&&evaluateCondition(condition);
                 else if(trigger.contains("khi điều kiện chuyển thành đúng")){
                     boolean current=!condition.isEmpty()&&evaluateCondition(condition);
@@ -355,6 +358,8 @@ public class MainActivity extends Activity {
                     }
                 }
             }
+            else if("left".equals(phase))match=trigger.contains("bấm nút trái");
+            else if("right".equals(phase))match=trigger.contains("bấm nút phải");
             else if("jump".equals(phase))match=trigger.contains("bấm nút nhảy")||trigger.contains("nút nhảy");
             else if("shoot".equals(phase))match=trigger.contains("bấm nút bắn")||trigger.contains("nút bắn");
             else if("objectCollision".equals(phase)){match=trigger.contains("chạm")&&contactType!=null;if(match&&!trigger.contains("hai đối tượng")){String[] types=contactType.split("\\|");match=types.length==2&&trigger.contains(types[0])&&trigger.contains(types[1]);}}
@@ -621,10 +626,33 @@ public class MainActivity extends Activity {
         // Platforms handle landing above; do not force an invisible floor, so the player can fall off-screen.
         previousContacts.clear();previousContacts.addAll(currentContacts);
         runtimeScore=(int)Math.round(runtimeVars.getOrDefault("Score",0d));runtimeLives=(int)Math.round(runtimeVars.getOrDefault("Lives",3d));
-        JSONObject activePlayer=findPlayer();if(runtimeLives<=0||(activePlayer!=null&&(runtimeObjectHealthValue(activePlayer)<=0||destroyedRuntimeObjects.contains(activePlayer.optString("name","Player"))))){runtimeGameOver=true;moveAxis=0;runtimePlayerVX=0;runtimePlayerVY=0;jumpRequested=false;}
+        JSONObject activePlayer=findPlayer();if(runtimeLives<=0||(activePlayer!=null&&(runtimeObjectHealthValue(activePlayer)<=0||destroyedRuntimeObjects.contains(activePlayer.optString("name","Player"))))){runtimeGameOver=true;moveAxis=0;leftButtonHeld=false;rightButtonHeld=false;runtimePlayerVX=0;runtimePlayerVY=0;jumpRequested=false;}
+    }
+    void refreshMoveAxis(){
+        moveAxis=(rightButtonHeld?1:0)-(leftButtonHeld?1:0);
     }
     Button holdButton(String text,int direction){
-        Button b=btn(text,()->{});b.setOnTouchListener((v,e)->{if(e.getAction()==MotionEvent.ACTION_DOWN){moveAxis=direction;return true;}if(e.getAction()==MotionEvent.ACTION_UP||e.getAction()==MotionEvent.ACTION_CANCEL){if(moveAxis==direction)moveAxis=0;return true;}return true;});return b;
+        Button b=btn(text,()->{});
+        b.setOnTouchListener((v,e)->{
+            if(e.getAction()==MotionEvent.ACTION_DOWN){
+                if(direction<0){
+                    leftButtonHeld=true;
+                    executePhase("left",null);
+                }else{
+                    rightButtonHeld=true;
+                    executePhase("right",null);
+                }
+                refreshMoveAxis();
+                return true;
+            }
+            if(e.getAction()==MotionEvent.ACTION_UP||e.getAction()==MotionEvent.ACTION_CANCEL){
+                if(direction<0)leftButtonHeld=false;else rightButtonHeld=false;
+                refreshMoveAxis();
+                return true;
+            }
+            return true;
+        });
+        return b;
     }
     JSONObject read(File f)throws Exception{ByteArrayOutputStream b=new ByteArrayOutputStream();try(InputStream in=new FileInputStream(f)){byte[] buf=new byte[4096];int n;while((n=in.read(buf))>0)b.write(buf,0,n);}return new JSONObject(b.toString("UTF-8"));}
     void open(File f){try{project=read(f);activeFile=f;tab=project.optString("dimension","2D");preview=false;selected=0;editor();}catch(Exception e){toast("Không mở được dự án");}}
