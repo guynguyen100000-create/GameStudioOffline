@@ -807,13 +807,19 @@ public class MainActivity extends Activity {
             root.addView(label("Kích thước: "+sceneWidth()+" × "+sceneHeight()+" px",12,muted,false));
             root.addView(label("Chạm trực tiếp vào đối tượng để chọn; kéo để đặt vị trí. Khi bật bắt dính, vị trí sẽ căn theo lưới.",12,muted,false));
             LinearLayout tools=row();tools.addView(btn("+ Player",()->add("Player","player",Color.BLUE)));tools.addView(btn("+ Enemy",()->add("Enemy","enemy",Color.RED)));tools.addView(btn("+ Khối",()->add("Cube","cube",Color.rgb(110,130,255))));tools.addView(btn("+ Coin",()->add("Coin","coin",Color.YELLOW)));tools.addView(btn("+ Nền",()->add("Platform","platform",Color.GREEN)));root.addView(scroll(tools));root.addView(btn("+ Thêm mẫu Đạn (Projectile)",()->add("Projectile","projectile",Color.YELLOW)));
-            root.addView(label("Đang chọn: "+selectedName(),14,fg,true));
+            JSONObject activeSelection=selectedObject();
+            root.addView(label("Đang chọn: "+selectedName()+" • "+(activeSelection==null?"":(activeSelection.optBoolean("visible",true)?"Đang hiện":"Đang ẩn")+" • "+(activeSelection.optBoolean("locked",false)?"Đã khóa":"Có thể kéo")),14,fg,true));
             LinearLayout layerTools=row();layerTools.addView(btn("↑ Lên trước",()->moveSelectedLayer(1)));layerTools.addView(btn("↓ Ra sau",()->moveSelectedLayer(-1)));root.addView(layerTools);
+            LinearLayout quickObjectTools=row();
+            quickObjectTools.addView(btn(activeSelection!=null&&!activeSelection.optBoolean("visible",true)?"Hiện đối tượng":"Ẩn đối tượng",this::toggleSelectedVisibility));
+            quickObjectTools.addView(btn(activeSelection!=null&&activeSelection.optBoolean("locked",false)?"Mở khóa kéo":"Khóa kéo",this::toggleSelectedLock));
+            root.addView(quickObjectTools);
             root.addView(btn("Sửa thuộc tính",this::editObject));root.addView(btn("Xuất dự án ZIP",this::exportZip));root.addView(btn("Xuất APK",this::apkNotice));
         }else if(tab.equals("Đối tượng"))objectPanel(root);else if(tab.equals("Sự kiện"))eventPanel(root);else variablePanel(root);
         setContentView(scroll(root));
     }
-    String selectedName(){JSONArray a=objects();if(a.length()==0)return "(không có)";selected=Math.max(0,Math.min(selected,a.length()-1));return a.optJSONObject(selected).optString("name","Object");}
+    JSONObject selectedObject(){JSONArray a=objects();if(a.length()==0)return null;selected=Math.max(0,Math.min(selected,a.length()-1));return a.optJSONObject(selected);}
+    String selectedName(){JSONObject o=selectedObject();return o==null?"(không có)":o.optString("name","Object");}
     void objectPanel(LinearLayout root){
         root.addView(label("Đối tượng trong cảnh",18,fg,true));
         root.addView(label("Lớp 1 nằm phía sau; số lớp lớn hơn sẽ được vẽ phía trước.",12,muted,false));
