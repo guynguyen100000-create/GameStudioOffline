@@ -228,7 +228,7 @@ public class MainActivity extends Activity {
     }
     int selected=0;
     final String[] triggerChoices={"Khi bắt đầu cảnh","Mỗi khung hình","Mỗi 0.5 giây","Mỗi 1 giây","Mỗi 2 giây","Mỗi 3 giây","Mỗi 5 giây","Mỗi 10 giây","Khi Player chạm Coin","Khi Player chạm Enemy","Khi Player chạm Cube","Khi Player chạm Platform","Khi Player chạm bất kỳ đối tượng nào","Khi Projectile chạm Enemy","Khi Enemy chạm Coin","Khi hai đối tượng chạm nhau","Khi bấm nút Nhảy","Khi bấm nút Bắn","Khi điều kiện chuyển thành đúng","Trong khi điều kiện đúng","Khi Player rơi khỏi màn hình"};
-    final String[] actionChoices={"Đặt biến Score = 0","Tăng Score thêm 1","Tăng Score thêm 10","Giảm Score đi 1","Đặt biến Lives = 3","Tăng Lives thêm 1","Ẩn Coin","Hiện Coin","Ẩn Enemy","Hiện Enemy","Bật va chạm Enemy","Tắt va chạm Enemy","Bật va chạm Player","Tắt va chạm Player","Bật va chạm Coin","Tắt va chạm Coin","Cho Player nhảy","Trừ 1 mạng","Di chuyển Player","Di chuyển Player sang trái","Di chuyển Player sang phải","Hồi sinh Player","Đặt Gravity = 950","Đặt MoveSpeed = 240","Đặt JumpStrength = 430","Cho Enemy tự đi sang phải","Cho Enemy tự đi sang trái","Dừng Enemy","Cho Enemy đuổi theo Player","Dừng Enemy đuổi theo Player","Bắn Projectile","Trừ 10 máu Player","Trừ 25 máu Enemy","Trừ 25 máu Enemy vừa trúng","Hủy Projectile vừa trúng","Loại bỏ Enemy vừa trúng","Hồi 25 máu Player","Đưa Player về điểm xuất phát","Lệnh tùy chỉnh (xem ô bên dưới)"};
+    final String[] actionChoices={"Đặt biến Score = 0","Tăng Score thêm 1","Tăng Score thêm 10","Giảm Score đi 1","Đặt biến Lives = 3","Tăng Lives thêm 1","Ẩn Coin","Hiện Coin","Ẩn Enemy","Hiện Enemy","Ẩn Player","Hiện Player","Ẩn Projectile","Hiện Projectile","Ẩn Cube","Hiện Cube","Ẩn Platform","Hiện Platform","Bật va chạm Enemy","Tắt va chạm Enemy","Bật va chạm Player","Tắt va chạm Player","Bật va chạm Coin","Tắt va chạm Coin","Bật va chạm Projectile","Tắt va chạm Projectile","Bật va chạm Cube","Tắt va chạm Cube","Bật va chạm Platform","Tắt va chạm Platform","Cho Player nhảy","Trừ 1 mạng","Di chuyển Player","Di chuyển Player sang trái","Di chuyển Player sang phải","Hồi sinh Player","Đặt Gravity = 950","Đặt MoveSpeed = 240","Đặt JumpStrength = 430","Cho Enemy tự đi sang phải","Cho Enemy tự đi sang trái","Dừng Enemy","Cho Enemy đuổi theo Player","Dừng Enemy đuổi theo Player","Bắn Projectile","Trừ 10 máu Player","Trừ 25 máu Enemy","Trừ 25 máu Enemy vừa trúng","Hủy Projectile vừa trúng","Loại bỏ Enemy vừa trúng","Hồi 25 máu Player","Đưa Player về điểm xuất phát","Lệnh tùy chỉnh (xem ô bên dưới)"};
     // Runtime state is separate from editor data; play-testing never changes saved object positions.
     final Map<String,Double> runtimeVars = new HashMap<>();
     final Map<String,Double> runtimeObjectX = new HashMap<>();
@@ -509,6 +509,7 @@ public class MainActivity extends Activity {
         Matcher hide=Pattern.compile("(?i)^(hide|show|destroy)\\s+(.+)$").matcher(command);
         Matcher collision=Pattern.compile("(?i)^(?:collision|setcollision)\\s+(.+?)\\s+(on|off|true|false|1|0|enable|disable)$").matcher(command);
         Matcher localizedCollision=Pattern.compile("(?i)^(bật|tắt)\\s+va chạm\\s+(.+)$").matcher(command);
+        Matcher localizedVisibility=Pattern.compile("(?i)^(ẩn|hiện)\\s+(.+)$").matcher(command);
         if(customSet.matches()){
             String key=customSet.group(1);Double calculated=resolveValue(customSet.group(2));if(calculated==null)return;
             setRuntimeValue(key,calculated);updateHudValues();return;
@@ -537,6 +538,13 @@ public class MainActivity extends Activity {
         if(hide.matches()){String verb=hide.group(1).toLowerCase(Locale.ROOT),target=hide.group(2);String actualTarget=resolveLastHitTarget(target);if(verb.equals("destroy"))destroyMatchingObjects(actualTarget);else hideMatchingObjects(actualTarget,verb.equals("hide"));updateHudValues();return;}
         if(collision.matches()){String state=collision.group(2).toLowerCase(Locale.ROOT);boolean enabled=state.equals("on")||state.equals("true")||state.equals("1")||state.equals("enable");setRuntimeCollisionEnabled(collision.group(1),enabled);updateHudValues();return;}
         if(localizedCollision.matches()){setRuntimeCollisionEnabled(localizedCollision.group(2),localizedCollision.group(1).equalsIgnoreCase("bật"));updateHudValues();return;}
+        if(localizedVisibility.matches()){
+            String target=localizedVisibility.group(2).trim();
+            boolean hidden=localizedVisibility.group(1).equalsIgnoreCase("ẩn");
+            if(target.equalsIgnoreCase("Coin"))setCoinsHidden(hidden);
+            else hideMatchingObjects(resolveLastHitTarget(target),hidden);
+            updateHudValues();return;
+        }
         if(command.equalsIgnoreCase("respawn Player")||command.equalsIgnoreCase("respawn player")){runtimePlayerX=runtimeSpawnX;runtimePlayerY=runtimeSpawnY;runtimePlayerVY=0;runtimeGrounded=false;updateHudValues();return;}
         Matcher set=Pattern.compile("(?i).*đặt(?:\\s+biến)?\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*([A-Za-z0-9_ .+*/()%\\-]+).*").matcher(action);
         if(set.matches()){
