@@ -24,6 +24,7 @@ public class MainActivity extends Activity {
     final Map<String,Bitmap> spriteCache=new HashMap<>();
 
     boolean finiteNumber(double value){return !Double.isNaN(value)&&!Double.isInfinite(value);}
+    int colorWithOpacity(int color,int opacity){return Color.argb(Color.alpha(color)*Math.max(0,Math.min(255,opacity))/255,Color.red(color),Color.green(color),Color.blue(color));}
     double snapCoordinate(double value){int step=Math.max(1,snapGridSize);return snapToGrid?Math.round(value/step)*(double)step:value;}
     int sceneWidth(){return project==null?960:Math.max(1,project.optInt("width",960));}
     int sceneHeight(){return project==null?540:Math.max(1,project.optInt("height",540));}
@@ -78,9 +79,9 @@ public class MainActivity extends Activity {
                 throw new IOException("Đối tượng thứ "+(i+1)+" thiếu tên");
             double x=o.optDouble("x",Double.NaN),y=o.optDouble("y",Double.NaN);
             double w=o.optDouble("w",Double.NaN),h=o.optDouble("h",Double.NaN);
-            double health=o.optDouble("health",100),vx=o.optDouble("vx",0),vy=o.optDouble("vy",0);
+            double health=o.optDouble("health",100),vx=o.optDouble("vx",0),vy=o.optDouble("vy",0),angle=o.optDouble("angle",0),opacity=o.optDouble("opacity",255);
             if(!finiteNumber(x)||!finiteNumber(y)||!finiteNumber(w)||!finiteNumber(h)||
-               !finiteNumber(health)||!finiteNumber(vx)||!finiteNumber(vy)||w<0||h<0||health<0)
+               !finiteNumber(health)||!finiteNumber(vx)||!finiteNumber(vy)||!finiteNumber(angle)||!finiteNumber(opacity)||w<0||h<0||health<0||opacity<0||opacity>255)
                 throw new IOException("Dữ liệu số của đối tượng "+o.optString("name")+" không hợp lệ");
         }
         JSONArray variables=loaded.optJSONArray("variables");
@@ -133,7 +134,7 @@ public class MainActivity extends Activity {
     TextView card(String s){TextView t=label(s,14,fg,false);t.setPadding(dp(12),dp(12),dp(12),dp(12));GradientDrawable d=new GradientDrawable();d.setColor(panel);d.setCornerRadius(dp(10));t.setBackground(d);return t;}
     String safe(String s){return s.replaceAll("[^A-Za-z0-9_-]","_");}
     void toast(String s){Toast.makeText(this,s,Toast.LENGTH_LONG).show();}
-    JSONObject obj(String n,String type,double x,double y,double w,double h,int c)throws Exception{JSONObject o=new JSONObject();o.put("name",n);o.put("type",type);o.put("x",x);o.put("y",y);o.put("w",w);o.put("h",h);o.put("color",c);return o;}
+    JSONObject obj(String n,String type,double x,double y,double w,double h,int c)throws Exception{JSONObject o=new JSONObject();o.put("name",n);o.put("type",type);o.put("x",x);o.put("y",y);o.put("w",w);o.put("h",h);o.put("color",c);o.put("angle",0);o.put("opacity",255);o.put("visible",true);o.put("collisionEnabled",true);return o;}
     JSONObject event(String trigger,String action)throws Exception{JSONObject e=new JSONObject();e.put("trigger",trigger);e.put("action",action);return e;}
     JSONObject variable(String name,double value)throws Exception{JSONObject v=new JSONObject();v.put("name",name);v.put("value",value);return v;}
 
@@ -793,7 +794,9 @@ public class MainActivity extends Activity {
     void editObject(){
         JSONArray a=objects();if(a.length()==0)return;selected=Math.max(0,Math.min(selected,a.length()-1));JSONObject o=a.optJSONObject(selected);
         LinearLayout box=new LinearLayout(this);box.setPadding(dp(10),dp(6),dp(10),dp(6));box.setOrientation(LinearLayout.VERTICAL);
-        EditText n=field(o.optString("name"));EditText x=field(""+(int)o.optDouble("x"));EditText y=field(""+(int)o.optDouble("y"));EditText w=field(""+(int)o.optDouble("w"));EditText h=field(""+(int)o.optDouble("h"));EditText health=field(""+(int)o.optDouble("health",100));EditText vx=field(""+o.optDouble("vx",0));EditText vy=field(""+o.optDouble("vy",0));
+        EditText n=field(o.optString("name"));EditText x=field(""+(int)o.optDouble("x"));EditText y=field(""+(int)o.optDouble("y"));EditText w=field(""+(int)o.optDouble("w"));EditText h=field(""+(int)o.optDouble("h"));EditText health=field(""+(int)o.optDouble("health",100));EditText vx=field(""+o.optDouble("vx",0));EditText vy=field(""+o.optDouble("vy",0));EditText angle=field(""+o.optDouble("angle",0));EditText opacity=field(""+(int)o.optDouble("opacity",255));
+        angle.setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_SIGNED|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        opacity.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
         CheckBox visible=new CheckBox(this);visible.setText("Đối tượng đang hiển thị");visible.setTextColor(fg);visible.setButtonTintList(android.content.res.ColorStateList.valueOf(accent));visible.setChecked(o.optBoolean("visible",true));
         CheckBox collisions=new CheckBox(this);collisions.setText("Cho phép va chạm vật lý/sự kiện");collisions.setTextColor(fg);collisions.setButtonTintList(android.content.res.ColorStateList.valueOf(accent));collisions.setChecked(objectCollisionEnabled(o));
         String[] types={"player","enemy","cube","coin","platform","projectile"};
@@ -809,10 +812,10 @@ public class MainActivity extends Activity {
         int oldColor=o.optInt("color",Color.BLUE), colorIndex=0;
         for(int i=0;i<colors.length;i++)if(colors[i]==oldColor){colorIndex=i;break;}
         color.setSelection(colorIndex);
-        for(Object[] pair:new Object[][]{{"Tên",n},{"Loại đối tượng",type},{"Màu",color},{"Vị trí X",x},{"Vị trí Y",y},{"Chiều rộng",w},{"Chiều cao",h},{"Máu ban đầu (Health)",health},{"Vận tốc X ban đầu (đơn vị/giây)",vx},{"Vận tốc Y ban đầu (đơn vị/giây)",vy}}){box.addView(label((String)pair[0],12,muted,false));box.addView((View)pair[1]);}
+        for(Object[] pair:new Object[][]{{"Tên",n},{"Loại đối tượng",type},{"Màu",color},{"Vị trí X",x},{"Vị trí Y",y},{"Chiều rộng",w},{"Chiều cao",h},{"Góc xoay (độ)",angle},{"Độ trong suốt (0–255)",opacity},{"Máu ban đầu (Health)",health},{"Vận tốc X ban đầu (đơn vị/giây)",vx},{"Vận tốc Y ban đầu (đơn vị/giây)",vy}}){box.addView(label((String)pair[0],12,muted,false));box.addView((View)pair[1]);}
         box.addView(label("Hiển thị",12,muted,false));box.addView(visible);
         box.addView(label("Va chạm",12,muted,false));box.addView(collisions);
-        new AlertDialog.Builder(this).setTitle("Thuộc tính đối tượng").setView(box).setNegativeButton("Hủy",null).setPositiveButton("Lưu",(d,z)->{try{String newName=n.getText().toString().trim();if(newName.isEmpty()){toast("Tên đối tượng không được để trống");return;}if(objectNameExists(newName,a,selected)){toast("Tên đối tượng đã tồn tại: "+newName);return;}double nx=num(x),ny=num(y),nw=Math.max(1,num(w)),nh=Math.max(1,num(h)),hp=Math.max(0,num(health)),nvx=num(vx),nvy=num(vy);o.put("name",newName);o.put("type",types[type.getSelectedItemPosition()]);o.put("color",colors[color.getSelectedItemPosition()]);o.put("x",nx);o.put("y",ny);o.put("w",nw);o.put("h",nh);o.put("health",hp);o.put("vx",nvx);o.put("vy",nvy);o.put("visible",visible.isChecked());o.put("collisionEnabled",collisions.isChecked());spriteCache.clear();save();editor();}catch(Exception ex){toast("Các giá trị phải là số hợp lệ và hữu hạn");}}).show();
+        new AlertDialog.Builder(this).setTitle("Thuộc tính đối tượng").setView(box).setNegativeButton("Hủy",null).setPositiveButton("Lưu",(d,z)->{try{String newName=n.getText().toString().trim();if(newName.isEmpty()){toast("Tên đối tượng không được để trống");return;}if(objectNameExists(newName,a,selected)){toast("Tên đối tượng đã tồn tại: "+newName);return;}double nx=num(x),ny=num(y),nw=Math.max(1,num(w)),nh=Math.max(1,num(h)),hp=Math.max(0,num(health)),nvx=num(vx),nvy=num(vy),rotation=num(angle),alpha=num(opacity);if(alpha<0||alpha>255){toast("Độ trong suốt phải nằm trong khoảng 0–255");return;}o.put("name",newName);o.put("type",types[type.getSelectedItemPosition()]);o.put("color",colors[color.getSelectedItemPosition()]);o.put("x",nx);o.put("y",ny);o.put("w",nw);o.put("h",nh);o.put("angle",rotation);o.put("opacity",(int)Math.round(alpha));o.put("health",hp);o.put("vx",nvx);o.put("vy",nvy);o.put("visible",visible.isChecked());o.put("collisionEnabled",collisions.isChecked());spriteCache.clear();save();editor();}catch(Exception ex){toast("Các giá trị phải là số hợp lệ và hữu hạn");}}).show();
     }
     void duplicateSelected(){
         JSONArray a=objects();if(a.length()==0)return;
@@ -1022,7 +1025,60 @@ public class MainActivity extends Activity {
         Paint p=new Paint(3);boolean run,three;float dx,dy;double sx,sy;boolean drag;
         SceneView(boolean r,boolean d){super(MainActivity.this);run=r;three=d;setBackgroundColor(bg);}
         @Override protected void onDraw(Canvas c){super.onDraw(c);c.drawColor(Color.rgb(20,33,51));if(run)tickRuntime();int sw=sceneWidth(),sh=sceneHeight();float scale=Math.min(getWidth()/(float)sw,getHeight()/(float)sh);if(scale<=0)return;c.save();c.translate((getWidth()-sw*scale)/2,(getHeight()-sh*scale)/2);c.scale(scale,scale);if(three)draw3(c);else draw2(c);c.restore();p.setColor(muted);p.setTextSize(18);c.drawText(run?(three?"CHẠY THỬ 3D":"CHẠY THỬ 2D"):(three?"3D VIEW":"2D SCENE"),12,24,p);if(run){p.setColor(Color.WHITE);p.setTextSize(20);String extraHud="";if(runtimeVars.containsKey("Gold"))extraHud+="   Gold: "+(int)Math.round(runtimeVars.getOrDefault("Gold",0d));if(runtimeVars.containsKey("Level"))extraHud+="   Level: "+(int)Math.round(runtimeVars.getOrDefault("Level",1d));c.drawText("Score: "+runtimeScore+"   Lives: "+runtimeLives+(findPlayer()!=null?"   HP: "+(int)Math.round(runtimeObjectHealthValue(findPlayer())):"")+extraHud,12,52,p);if(runtimeGameOver){p.setColor(Color.RED);p.setTextSize(38);c.drawText("GAME OVER",Math.max(12,getWidth()/2f-105),getHeight()/2f,p);}postInvalidateDelayed(40);}}
-        void draw2(Canvas c){int sw=sceneWidth(),sh=sceneHeight();p.setColor(sceneBackgroundColor());c.drawRect(0,0,sw,sh,p);p.setColor(Color.argb(70,255,255,255));int grid=Math.max(10,Math.min(80,snapGridSize));for(int x=0;x<=sw;x+=grid)c.drawLine(x,0,x,sh,p);for(int y=0;y<=sh;y+=grid)c.drawLine(0,y,sw,y,p);JSONArray a=run?runtimeSceneObjects():objects();for(int i=0;i<a.length();i++){JSONObject o=a.optJSONObject(i);if(o==null||(!run&&!o.optBoolean("visible",true))||(run&&(hiddenRuntimeObjects.contains(o.optString("name"))||destroyedRuntimeObjects.contains(o.optString("name")))))continue;float x=(float)(run?runtimeObjectCoordinate(o,true):o.optDouble("x")),y=(float)(run?runtimeObjectCoordinate(o,false):o.optDouble("y")),w=(float)o.optDouble("w"),h=(float)o.optDouble("h");String type=o.optString("type");p.setColor(o.optInt("color",Color.WHITE));Bitmap sprite=loadSprite(o.optString("image",""));if(sprite!=null)c.drawBitmap(sprite,null,new RectF(x,y,x+Math.max(1,w),y+Math.max(1,h)),p);else if(type.equals("coin")||type.equals("projectile"))c.drawCircle(x+w/2,y+h/2,Math.max(w,h)/2,p);else if(type.equals("platform")){c.drawRect(x,y,x+Math.max(40,w),y+Math.max(20,h),p);p.setColor(Color.rgb(117,73,45));c.drawRect(x,y+h*.6f,x+Math.max(40,w),y+Math.max(20,h),p);}else if(type.equals("camera")||type.equals("light")){p.setTextSize(25);c.drawText(type.equals("camera")?"CAM":"LGT",x+8,y+32,p);}else{c.drawRoundRect(x,y,x+Math.max(34,w),y+Math.max(34,h),8,8,p);p.setColor(Color.WHITE);p.setTextSize(13);c.drawText(o.optString("name"),x,y-4,p);}if(run&&(type.equals("enemy")||type.equals("player")))drawRuntimeHealthBar(c,o,x,y,Math.max(34,w));if(!run&&i==selected){p.setColor(Color.WHITE);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(3);c.drawRect(x-4,y-4,x+Math.max(34,w)+4,y+Math.max(34,h)+4,p);p.setStyle(Paint.Style.FILL);}}}
+        void draw2(Canvas c){
+            int sw=sceneWidth(),sh=sceneHeight();
+            p.setColor(sceneBackgroundColor());c.drawRect(0,0,sw,sh,p);
+            p.setColor(Color.argb(70,255,255,255));
+            int grid=Math.max(10,Math.min(80,snapGridSize));
+            for(int gx=0;gx<=sw;gx+=grid)c.drawLine(gx,0,gx,sh,p);
+            for(int gy=0;gy<=sh;gy+=grid)c.drawLine(0,gy,sw,gy,p);
+            JSONArray a=run?runtimeSceneObjects():objects();
+            for(int i=0;i<a.length();i++){
+                JSONObject o=a.optJSONObject(i);
+                if(o==null||(!run&&!o.optBoolean("visible",true))||
+                   (run&&(hiddenRuntimeObjects.contains(o.optString("name"))||destroyedRuntimeObjects.contains(o.optString("name")))))continue;
+                float x=(float)(run?runtimeObjectCoordinate(o,true):o.optDouble("x"));
+                float y=(float)(run?runtimeObjectCoordinate(o,false):o.optDouble("y"));
+                float w=(float)o.optDouble("w"),h=(float)o.optDouble("h");
+                String type=o.optString("type");
+                int opacity=Math.max(0,Math.min(255,o.optInt("opacity",255)));
+                float centerX=x+Math.max(1,w)/2f,centerY=y+Math.max(1,h)/2f;
+                c.save();
+                if(Math.abs(o.optDouble("angle",0))>0.001)c.rotate((float)o.optDouble("angle",0),centerX,centerY);
+                p.setColor(colorWithOpacity(o.optInt("color",Color.WHITE),opacity));
+                Bitmap sprite=loadSprite(o.optString("image",""));
+                if(sprite!=null){
+                    p.setAlpha(opacity);
+                    c.drawBitmap(sprite,null,new RectF(x,y,x+Math.max(1,w),y+Math.max(1,h)),p);
+                    p.setAlpha(255);
+                }else if(type.equals("coin")||type.equals("projectile")){
+                    p.setColor(colorWithOpacity(o.optInt("color",Color.WHITE),opacity));
+                    c.drawCircle(centerX,centerY,Math.max(w,h)/2f,p);
+                }else if(type.equals("platform")){
+                    p.setColor(colorWithOpacity(o.optInt("color",Color.WHITE),opacity));
+                    c.drawRect(x,y,x+Math.max(40,w),y+Math.max(20,h),p);
+                    p.setColor(colorWithOpacity(Color.rgb(117,73,45),opacity));
+                    c.drawRect(x,y+h*.6f,x+Math.max(40,w),y+Math.max(20,h),p);
+                }else if(type.equals("camera")||type.equals("light")){
+                    p.setColor(colorWithOpacity(o.optInt("color",Color.WHITE),opacity));
+                    p.setTextSize(25);
+                    c.drawText(type.equals("camera")?"CAM":"LGT",x+8,y+32,p);
+                }else{
+                    p.setColor(colorWithOpacity(o.optInt("color",Color.WHITE),opacity));
+                    c.drawRoundRect(x,y,x+Math.max(34,w),y+Math.max(34,h),8,8,p);
+                    p.setColor(colorWithOpacity(Color.WHITE,opacity));
+                    p.setTextSize(13);
+                    c.drawText(o.optString("name"),x,y-4,p);
+                }
+                c.restore();
+                if(run&&(type.equals("enemy")||type.equals("player")))drawRuntimeHealthBar(c,o,x,y,Math.max(34,w));
+                if(!run&&i==selected){
+                    p.setColor(Color.WHITE);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(3);
+                    c.drawRect(x-4,y-4,x+Math.max(34,w)+4,y+Math.max(34,h)+4,p);
+                    p.setStyle(Paint.Style.FILL);
+                }
+            }
+        }
         void drawRuntimeHealthBar(Canvas c,JSONObject o,float x,float y,float w){double max=Math.max(1,o.optDouble("health",100)),hp=Math.max(0,Math.min(max,runtimeObjectHealthValue(o)));float top=y-9;p.setColor(Color.rgb(60,30,36));c.drawRect(x,top,x+w,top+5,p);p.setColor(hp/max>.35?Color.rgb(45,210,90):Color.rgb(245,75,70));c.drawRect(x,top,x+(float)(w*hp/max),top+5,p);}
      void draw3(Canvas c){int sw=sceneWidth(),sh=sceneHeight();p.setColor(sceneBackgroundColor());c.drawRect(0,0,sw,sh,p);p.setColor(Color.argb(95,255,255,255));for(int i=-sw;i<sw*2;i+=50){c.drawLine(sw/2f+i,0,sw/2f+i*.45f,sh,p);c.drawLine(0,sh/2f+i*.24f,sw,sh/2f+i*.24f,p);}JSONArray a=run?runtimeSceneObjects():objects();for(int i=0;i<a.length();i++){JSONObject o=a.optJSONObject(i);if(o==null||(!run&&!o.optBoolean("visible",true))||(run&&(hiddenRuntimeObjects.contains(o.optString("name"))||destroyedRuntimeObjects.contains(o.optString("name")))))continue;String type=o.optString("type");p.setColor(o.optInt("color",Color.BLUE));if(type.equals("camera")||type.equals("light")){p.setTextSize(22);c.drawText(type.equals("camera")?"◉ Camera":"☼ Light",35+i*20,55+i*24,p);continue;}float x=(float)(run?runtimeObjectCoordinate(o,true):o.optDouble("x")),y=(float)(run?runtimeObjectCoordinate(o,false):o.optDouble("y")),s=Math.max(30,(float)o.optDouble("w",60));float rawX=x,rawY=y;x=sw/2f+(rawX-sw/2f)*.72f-(rawY-sh/2f)*.35f;y=sh/2f+10+(rawY-sh/2f)*.48f+(x-sw/2f)*.18f;Path path=new Path();path.moveTo(x,y-s);path.lineTo(x+s/2,y-s+s/3);path.lineTo(x,y-s+2*s/3);path.lineTo(x-s/2,y-s+s/3);path.close();p.setColor(o.optInt("color",Color.BLUE));c.drawPath(path,p);p.setColor(Color.rgb(35,74,138));c.drawRect(x-s/2,y-s+s/3,x,y+s/3,p);p.setColor(Color.rgb(27,57,111));c.drawRect(x,y-s+2*s/3,x+s/2,y+s/3,p);if(run&&(type.equals("enemy")||type.equals("player")))drawRuntimeHealthBar(c,o,x-s/2,y-s,s);}}
         @Override public boolean onTouchEvent(android.view.MotionEvent e){
