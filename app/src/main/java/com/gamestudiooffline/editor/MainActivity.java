@@ -228,7 +228,7 @@ public class MainActivity extends Activity {
     }
     int selected=0;
     final String[] triggerChoices={"Khi bắt đầu cảnh","Mỗi khung hình","Mỗi 0.5 giây","Mỗi 1 giây","Mỗi 2 giây","Mỗi 3 giây","Mỗi 5 giây","Mỗi 10 giây","Khi Player chạm Coin","Khi Player chạm Enemy","Khi Player chạm Cube","Khi Player chạm Platform","Khi Player chạm bất kỳ đối tượng nào","Khi Projectile chạm Enemy","Khi Enemy chạm Coin","Khi hai đối tượng chạm nhau","Khi bấm nút Nhảy","Khi bấm nút Bắn","Khi điều kiện chuyển thành đúng","Trong khi điều kiện đúng","Khi Player rơi khỏi màn hình"};
-    final String[] actionChoices={"Đặt biến Score = 0","Tăng Score thêm 1","Tăng Score thêm 10","Giảm Score đi 1","Đặt biến Lives = 3","Tăng Lives thêm 1","Ẩn Coin","Hiện Coin","Ẩn Enemy","Hiện Enemy","Cho Player nhảy","Trừ 1 mạng","Di chuyển Player","Di chuyển Player sang trái","Di chuyển Player sang phải","Hồi sinh Player","Đặt Gravity = 950","Đặt MoveSpeed = 240","Đặt JumpStrength = 430","Cho Enemy tự đi sang phải","Cho Enemy tự đi sang trái","Dừng Enemy","Cho Enemy đuổi theo Player","Dừng Enemy đuổi theo Player","Bắn Projectile","Trừ 10 máu Player","Trừ 25 máu Enemy","Trừ 25 máu Enemy vừa trúng","Hủy Projectile vừa trúng","Loại bỏ Enemy vừa trúng","Hồi 25 máu Player","Đưa Player về điểm xuất phát","Lệnh tùy chỉnh (xem ô bên dưới)"};
+    final String[] actionChoices={"Đặt biến Score = 0","Tăng Score thêm 1","Tăng Score thêm 10","Giảm Score đi 1","Đặt biến Lives = 3","Tăng Lives thêm 1","Ẩn Coin","Hiện Coin","Ẩn Enemy","Hiện Enemy","Bật va chạm Enemy","Tắt va chạm Enemy","Bật va chạm Player","Tắt va chạm Player","Bật va chạm Coin","Tắt va chạm Coin","Cho Player nhảy","Trừ 1 mạng","Di chuyển Player","Di chuyển Player sang trái","Di chuyển Player sang phải","Hồi sinh Player","Đặt Gravity = 950","Đặt MoveSpeed = 240","Đặt JumpStrength = 430","Cho Enemy tự đi sang phải","Cho Enemy tự đi sang trái","Dừng Enemy","Cho Enemy đuổi theo Player","Dừng Enemy đuổi theo Player","Bắn Projectile","Trừ 10 máu Player","Trừ 25 máu Enemy","Trừ 25 máu Enemy vừa trúng","Hủy Projectile vừa trúng","Loại bỏ Enemy vừa trúng","Hồi 25 máu Player","Đưa Player về điểm xuất phát","Lệnh tùy chỉnh (xem ô bên dưới)"};
     // Runtime state is separate from editor data; play-testing never changes saved object positions.
     final Map<String,Double> runtimeVars = new HashMap<>();
     final Map<String,Double> runtimeObjectX = new HashMap<>();
@@ -238,6 +238,8 @@ public class MainActivity extends Activity {
     final Map<String,Double> runtimeObjectHealth = new HashMap<>();
     final Map<String,Double> runtimeObjectAngle = new HashMap<>();
     final Map<String,Double> runtimeObjectOpacity = new HashMap<>();
+    // Event-driven collision overrides exist only during play-testing; saved editor settings remain unchanged.
+    final Map<String,Boolean> runtimeCollisionOverrides = new HashMap<>();
     final Map<String,Double> runtimeFollowSpeed = new HashMap<>();
     String lastObjectCollisionA="",lastObjectCollisionB="",lastObjectCollisionTypeA="",lastObjectCollisionTypeB="";
     final ArrayList<JSONObject> runtimeSpawnedObjects = new ArrayList<>();
@@ -256,6 +258,7 @@ public class MainActivity extends Activity {
     long lastRuntimeTick=0, runtimeStartMillis=0;
 
     void startRuntime(){
+        runtimeCollisionOverrides.clear();
         runtimeVars.clear();runtimeVars.put("Score",0d);runtimeVars.put("Lives",3d);runtimeVars.put("Timer",0d);
         JSONArray savedVars=project.optJSONArray("variables");
         if(savedVars!=null)for(int i=0;i<savedVars.length();i++){JSONObject v=savedVars.optJSONObject(i);if(v!=null){String n=v.optString("name","").trim();if(!n.isEmpty())putRuntimeVar(n,v.optDouble("value",0));}}
@@ -270,7 +273,7 @@ public class MainActivity extends Activity {
         lastRuntimeTick=System.currentTimeMillis();runtimeStartMillis=lastRuntimeTick;runtimeStarted=true;
         executePhase("start",null);
     }
-    void stopRuntime(){runtimeStarted=false;moveAxis=0;jumpRequested=false;hiddenRuntimeObjects.clear();destroyedRuntimeObjects.clear();previousContacts.clear();runtimeSpawnedObjects.clear();runtimeSpawnCounter=0;runtimeFollowSpeed.clear();runtimeObjectX.clear();runtimeObjectY.clear();runtimeObjectVX.clear();runtimeObjectVY.clear();runtimeObjectHealth.clear();runtimeObjectAngle.clear();runtimeObjectOpacity.clear();}
+    void stopRuntime(){runtimeStarted=false;moveAxis=0;jumpRequested=false;hiddenRuntimeObjects.clear();destroyedRuntimeObjects.clear();previousContacts.clear();runtimeSpawnedObjects.clear();runtimeSpawnCounter=0;runtimeFollowSpeed.clear();runtimeObjectX.clear();runtimeObjectY.clear();runtimeObjectVX.clear();runtimeObjectVY.clear();runtimeObjectHealth.clear();runtimeObjectAngle.clear();runtimeObjectOpacity.clear();runtimeCollisionOverrides.clear();}
     JSONArray runtimeSceneObjects(){JSONArray all=new JSONArray();JSONArray base=objects();for(int i=0;i<base.length();i++){JSONObject o=base.optJSONObject(i);if(o!=null)all.put(o);}for(JSONObject o:runtimeSpawnedObjects)if(o!=null)all.put(o);return all;}
     boolean runtimeTargetMatches(JSONObject o,String query,JSONArray all){
         String q=query.trim().toLowerCase(Locale.ROOT),name=o.optString("name","").toLowerCase(Locale.ROOT),type=o.optString("type","").toLowerCase(Locale.ROOT);boolean exactNameExists=false;
@@ -278,7 +281,7 @@ public class MainActivity extends Activity {
         return exactNameExists?name.equals(q):(type.equals(q)||name.contains(q));
     }
     void cleanupRuntimeSpawns(){
-        java.util.Iterator<JSONObject> it=runtimeSpawnedObjects.iterator();while(it.hasNext()){JSONObject o=it.next();String n=o.optString("name","");double x=runtimeObjectCoordinate(o,true),y=runtimeObjectCoordinate(o,false);if(destroyedRuntimeObjects.contains(n)||x < -160||x > sceneWidth()+160||y < -160||y > sceneHeight()+160){it.remove();runtimeObjectX.remove(n);runtimeObjectY.remove(n);runtimeObjectVX.remove(n);runtimeObjectVY.remove(n);runtimeObjectHealth.remove(n);runtimeObjectAngle.remove(n);runtimeObjectOpacity.remove(n);runtimeFollowSpeed.remove(n);hiddenRuntimeObjects.remove(n);destroyedRuntimeObjects.remove(n);previousContacts.remove(o.optString("type","")+":"+n);previousContacts.removeIf(k->k.contains(n));}}
+        java.util.Iterator<JSONObject> it=runtimeSpawnedObjects.iterator();while(it.hasNext()){JSONObject o=it.next();String n=o.optString("name","");double x=runtimeObjectCoordinate(o,true),y=runtimeObjectCoordinate(o,false);if(destroyedRuntimeObjects.contains(n)||x < -160||x > sceneWidth()+160||y < -160||y > sceneHeight()+160){it.remove();runtimeObjectX.remove(n);runtimeObjectY.remove(n);runtimeObjectVX.remove(n);runtimeObjectVY.remove(n);runtimeObjectHealth.remove(n);runtimeObjectAngle.remove(n);runtimeObjectOpacity.remove(n);runtimeCollisionOverrides.remove(n);runtimeFollowSpeed.remove(n);hiddenRuntimeObjects.remove(n);destroyedRuntimeObjects.remove(n);previousContacts.remove(o.optString("type","")+":"+n);previousContacts.removeIf(k->k.contains(n));}}
     }
     JSONObject findObject(String query){
         if(query==null)return null;String q=query.trim();JSONArray a=objects();
@@ -294,7 +297,7 @@ public class MainActivity extends Activity {
         for(int i=0;i<base.length();i++){JSONObject o=base.optJSONObject(i);if(o!=null&&o.optString("name","").equalsIgnoreCase(q)){template=o;break;}}
         if(template==null)for(int i=0;i<base.length();i++){JSONObject o=base.optJSONObject(i);if(o!=null&&o.optString("type","").equalsIgnoreCase(q)){template=o;break;}}
         if(template==null||isPlayerObject(template)){toast("Không tìm thấy mẫu phù hợp để tạo: "+q);return;}
-        try{JSONObject instance=new JSONObject(template.toString());String baseName=template.optString("name",q).replaceAll("\\s+","_");String instanceName="Spawned_"+baseName+"_"+(++runtimeSpawnCounter);instance.put("name",instanceName);instance.put("x",x);instance.put("y",y);instance.put("vx",Double.isNaN(vx)?template.optDouble("vx",0):vx);instance.put("vy",Double.isNaN(vy)?template.optDouble("vy",0):vy);runtimeSpawnedObjects.add(instance);if(!instance.optBoolean("visible",true))hiddenRuntimeObjects.add(instanceName);runtimeObjectX.put(instanceName,x);runtimeObjectY.put(instanceName,y);runtimeObjectVX.put(instanceName,instance.optDouble("vx",0));runtimeObjectVY.put(instanceName,instance.optDouble("vy",0));runtimeObjectHealth.put(instanceName,instance.optDouble("health",100));runtimeObjectAngle.put(instanceName,instance.optDouble("angle",0));runtimeObjectOpacity.put(instanceName,instance.optDouble("opacity",255));}
+        try{JSONObject instance=new JSONObject(template.toString());String baseName=template.optString("name",q).replaceAll("\\s+","_");String instanceName="Spawned_"+baseName+"_"+(++runtimeSpawnCounter);instance.put("name",instanceName);instance.put("x",x);instance.put("y",y);instance.put("vx",Double.isNaN(vx)?template.optDouble("vx",0):vx);instance.put("vy",Double.isNaN(vy)?template.optDouble("vy",0):vy);runtimeSpawnedObjects.add(instance);if(!instance.optBoolean("visible",true))hiddenRuntimeObjects.add(instanceName);runtimeObjectX.put(instanceName,x);runtimeObjectY.put(instanceName,y);runtimeObjectVX.put(instanceName,instance.optDouble("vx",0));runtimeObjectVY.put(instanceName,instance.optDouble("vy",0));runtimeObjectHealth.put(instanceName,instance.optDouble("health",100));runtimeObjectAngle.put(instanceName,instance.optDouble("angle",0));runtimeObjectOpacity.put(instanceName,instance.optDouble("opacity",255));runtimeCollisionOverrides.put(instanceName,objectCollisionEnabled(instance));}
         catch(Exception e){toast("Không tạo được đối tượng runtime");}
     }
     String resolveLastHitTarget(String target){if(target==null)return "";if(target.equalsIgnoreCase("HitA"))return lastObjectCollisionA;if(target.equalsIgnoreCase("HitB"))return lastObjectCollisionB;if(target.equalsIgnoreCase("LastHitEnemy")){if(lastObjectCollisionTypeA.equalsIgnoreCase("enemy"))return lastObjectCollisionA;if(lastObjectCollisionTypeB.equalsIgnoreCase("enemy"))return lastObjectCollisionB;return target;}if(target.equalsIgnoreCase("LastHitProjectile")){if(lastObjectCollisionTypeA.equalsIgnoreCase("projectile"))return lastObjectCollisionA;if(lastObjectCollisionTypeB.equalsIgnoreCase("projectile"))return lastObjectCollisionB;return target;}return target;}
@@ -504,6 +507,8 @@ public class MainActivity extends Activity {
         Matcher follow=Pattern.compile("(?i)^follow\\s+([A-Za-z_][A-Za-z0-9_]*)\\s+player\\s+(\\d+(?:\\.\\d+)?)$").matcher(command);
         Matcher stopFollow=Pattern.compile("(?i)^stopfollow\\s+([A-Za-z_][A-Za-z0-9_]*)$").matcher(command);
         Matcher hide=Pattern.compile("(?i)^(hide|show|destroy)\\s+(.+)$").matcher(command);
+        Matcher collision=Pattern.compile("(?i)^(?:collision|setcollision)\\s+(.+?)\\s+(on|off|true|false|1|0|enable|disable)$").matcher(command);
+        Matcher localizedCollision=Pattern.compile("(?i)^(bật|tắt)\\s+va chạm\\s+(.+)$").matcher(command);
         if(customSet.matches()){
             String key=customSet.group(1);Double calculated=resolveValue(customSet.group(2));if(calculated==null)return;
             setRuntimeValue(key,calculated);updateHudValues();return;
@@ -530,6 +535,8 @@ public class MainActivity extends Activity {
         if(follow.matches()){JSONObject target=findObject(follow.group(1));if(target!=null&&!isPlayerObject(target))runtimeFollowSpeed.put(target.optString("name",""),Double.parseDouble(follow.group(2)));updateHudValues();return;}
         if(stopFollow.matches()){JSONObject target=findObject(stopFollow.group(1));if(target!=null){String n=target.optString("name","");runtimeFollowSpeed.remove(n);setObjectVelocity(n,true,0);setObjectVelocity(n,false,0);}updateHudValues();return;}
         if(hide.matches()){String verb=hide.group(1).toLowerCase(Locale.ROOT),target=hide.group(2);String actualTarget=resolveLastHitTarget(target);if(verb.equals("destroy"))destroyMatchingObjects(actualTarget);else hideMatchingObjects(actualTarget,verb.equals("hide"));updateHudValues();return;}
+        if(collision.matches()){String state=collision.group(2).toLowerCase(Locale.ROOT);boolean enabled=state.equals("on")||state.equals("true")||state.equals("1")||state.equals("enable");setRuntimeCollisionEnabled(collision.group(1),enabled);updateHudValues();return;}
+        if(localizedCollision.matches()){setRuntimeCollisionEnabled(localizedCollision.group(2),localizedCollision.group(1).equalsIgnoreCase("bật"));updateHudValues();return;}
         if(command.equalsIgnoreCase("respawn Player")||command.equalsIgnoreCase("respawn player")){runtimePlayerX=runtimeSpawnX;runtimePlayerY=runtimeSpawnY;runtimePlayerVY=0;runtimeGrounded=false;updateHudValues();return;}
         Matcher set=Pattern.compile("(?i).*đặt(?:\\s+biến)?\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*([A-Za-z0-9_ .+*/()%\\-]+).*").matcher(action);
         if(set.matches()){
@@ -585,7 +592,7 @@ public class MainActivity extends Activity {
             runtimePlayerY=Math.max(0,runtimePlayerY+runtimePlayerVY*dt);
             runtimeGrounded=false;
         }
-        boolean playerCanCollide=player!=null&&!hiddenRuntimeObjects.contains(player.optString("name",""))&&!destroyedRuntimeObjects.contains(player.optString("name",""))&&objectCollisionEnabled(player);
+        boolean playerCanCollide=player!=null&&!hiddenRuntimeObjects.contains(player.optString("name",""))&&!destroyedRuntimeObjects.contains(player.optString("name",""))&&runtimeObjectCollisionEnabled(player);
         JSONArray all=runtimeSceneObjects();Set<String> currentContacts=new HashSet<>();
         for(int i=0;i<all.length();i++){
             JSONObject o=all.optJSONObject(i);if(o==null||o==player)continue;
@@ -593,7 +600,7 @@ public class MainActivity extends Activity {
             if(hiddenRuntimeObjects.contains(name)||destroyedRuntimeObjects.contains(name))continue;
             Double followSpeed=runtimeFollowSpeed.get(name);if(followSpeed!=null){if(player!=null){double dx=runtimePlayerX-runtimeObjectCoordinate(o,true),dy=runtimePlayerY-runtimeObjectCoordinate(o,false),distance=Math.sqrt(dx*dx+dy*dy);if(distance>1){runtimeObjectVX.put(name,dx/distance*followSpeed);runtimeObjectVY.put(name,dy/distance*followSpeed);}else{runtimeObjectVX.put(name,0d);runtimeObjectVY.put(name,0d);}}else{runtimeObjectVX.put(name,0d);runtimeObjectVY.put(name,0d);}}
             runtimeObjectX.put(name,runtimeObjectCoordinate(o,true)+runtimeObjectVelocity(o,true)*dt);runtimeObjectY.put(name,runtimeObjectCoordinate(o,false)+runtimeObjectVelocity(o,false)*dt);
-            if(playerCanCollide&&objectCollisionEnabled(o)){
+            if(playerCanCollide&&runtimeObjectCollisionEnabled(o)){
                 double ox=runtimeObjectCoordinate(o,true),oy=runtimeObjectCoordinate(o,false),ow=Math.max(1,o.optDouble("w")),oh=Math.max(1,o.optDouble("h"));
                 boolean overlap=runtimePlayerX<ox+ow&&runtimePlayerX+pw>ox&&runtimePlayerY<oy+oh&&runtimePlayerY+ph>oy;
                 boolean landedOnThisPlatform=type.equals("platform")&&runtimePlayerVY>=0&&oldBottom<=oy+12&&runtimePlayerY+ph>=oy&&runtimePlayerX+pw>ox&&runtimePlayerX<ox+ow;
@@ -601,7 +608,7 @@ public class MainActivity extends Activity {
                 if(overlap&&!type.equals("camera")&&!type.equals("light")&&!type.equals("player")){String key=type+":"+name;currentContacts.add(key);if(!previousContacts.contains(key))executePhase("collision",type);}
             }
         }
-        for(int i=0;i<all.length();i++){JSONObject a=all.optJSONObject(i);if(a==null)continue;String nameA=a.optString("name","Object"),typeA=a.optString("type","").toLowerCase(Locale.ROOT);if(typeA.equals("player")||typeA.equals("camera")||typeA.equals("light")||hiddenRuntimeObjects.contains(nameA)||destroyedRuntimeObjects.contains(nameA)||!objectCollisionEnabled(a))continue;double ax=runtimeObjectCoordinate(a,true),ay=runtimeObjectCoordinate(a,false),aw=Math.max(1,a.optDouble("w",1)),ah=Math.max(1,a.optDouble("h",1));for(int j=i+1;j<all.length();j++){JSONObject b=all.optJSONObject(j);if(b==null)continue;String nameB=b.optString("name","Object"),typeB=b.optString("type","").toLowerCase(Locale.ROOT);if(typeB.equals("player")||typeB.equals("camera")||typeB.equals("light")||hiddenRuntimeObjects.contains(nameB)||destroyedRuntimeObjects.contains(nameB)||!objectCollisionEnabled(b))continue;double bx=runtimeObjectCoordinate(b,true),by=runtimeObjectCoordinate(b,false),bw=Math.max(1,b.optDouble("w",1)),bh=Math.max(1,b.optDouble("h",1));boolean overlap=ax<bx+bw&&ax+aw>bx&&ay<by+bh&&ay+ah>by;if(overlap){String key="pair:"+nameA+":"+nameB;currentContacts.add(key);if(!previousContacts.contains(key)){lastObjectCollisionA=nameA;lastObjectCollisionB=nameB;lastObjectCollisionTypeA=typeA;lastObjectCollisionTypeB=typeB;executePhase("objectCollision",typeA+"|"+typeB);if(destroyedRuntimeObjects.contains(nameA)||destroyedRuntimeObjects.contains(nameB))break;}}}}
+        for(int i=0;i<all.length();i++){JSONObject a=all.optJSONObject(i);if(a==null)continue;String nameA=a.optString("name","Object"),typeA=a.optString("type","").toLowerCase(Locale.ROOT);if(typeA.equals("player")||typeA.equals("camera")||typeA.equals("light")||hiddenRuntimeObjects.contains(nameA)||destroyedRuntimeObjects.contains(nameA)||!runtimeObjectCollisionEnabled(a))continue;double ax=runtimeObjectCoordinate(a,true),ay=runtimeObjectCoordinate(a,false),aw=Math.max(1,a.optDouble("w",1)),ah=Math.max(1,a.optDouble("h",1));for(int j=i+1;j<all.length();j++){JSONObject b=all.optJSONObject(j);if(b==null)continue;String nameB=b.optString("name","Object"),typeB=b.optString("type","").toLowerCase(Locale.ROOT);if(typeB.equals("player")||typeB.equals("camera")||typeB.equals("light")||hiddenRuntimeObjects.contains(nameB)||destroyedRuntimeObjects.contains(nameB)||!runtimeObjectCollisionEnabled(b))continue;double bx=runtimeObjectCoordinate(b,true),by=runtimeObjectCoordinate(b,false),bw=Math.max(1,b.optDouble("w",1)),bh=Math.max(1,b.optDouble("h",1));boolean overlap=ax<bx+bw&&ax+aw>bx&&ay<by+bh&&ay+ah>by;if(overlap){String key="pair:"+nameA+":"+nameB;currentContacts.add(key);if(!previousContacts.contains(key)){lastObjectCollisionA=nameA;lastObjectCollisionB=nameB;lastObjectCollisionTypeA=typeA;lastObjectCollisionTypeB=typeB;executePhase("objectCollision",typeA+"|"+typeB);if(destroyedRuntimeObjects.contains(nameA)||destroyedRuntimeObjects.contains(nameB))break;}}}}
         cleanupRuntimeSpawns();
         // Platforms handle landing above; do not force an invisible floor, so the player can fall off-screen.
         previousContacts.clear();previousContacts.addAll(currentContacts);
@@ -789,6 +796,18 @@ public class MainActivity extends Activity {
     }
     EditText field(String s){EditText e=new EditText(this);e.setSingleLine(true);e.setText(s);e.setTextColor(fg);e.setBackgroundColor(panel);return e;}
     boolean objectCollisionEnabled(JSONObject o){return o!=null&&o.optBoolean("collisionEnabled",true);}
+    boolean runtimeObjectCollisionEnabled(JSONObject o){return o!=null&&runtimeCollisionOverrides.getOrDefault(o.optString("name",""),objectCollisionEnabled(o));}
+    void setRuntimeCollisionEnabled(String query,boolean enabled){
+        if(query==null||query.trim().isEmpty())return;
+        JSONObject o=findObject(resolveLastHitTarget(query.trim()));
+        if(o==null)return;
+        String name=o.optString("name","");
+        runtimeCollisionOverrides.put(name,enabled);
+        if(!enabled){
+            previousContacts.removeIf(k->k.equals(o.optString("type","")+":"+name)||k.endsWith(":"+name)||k.contains(":"+name+":"));
+            if(isPlayerObject(o))runtimeGrounded=false;
+        }
+    }
 
     void toggleSelectedLock(){
         JSONArray a=objects();
@@ -917,6 +936,7 @@ public class MainActivity extends Activity {
         if(s.contains("hủy")||s.contains("loại bỏ")||s.contains("destroy"))return "Loại bỏ đối tượng trong lúc chơi thử. Dùng khi đạn trúng mục tiêu hoặc vật phẩm đã được nhặt.";
         if(s.contains("máu")||s.contains("mạng"))return "Thay đổi lượng máu hoặc số mạng của nhân vật. Kiểm tra điều kiện thua/thắng sau đó.";
         if(s.contains("bắn"))return "Tạo hoặc phóng đạn theo hành động đã chọn. Cần có đối tượng Projectile trong cảnh.";
+        if(s.contains("va chạm"))return "Bật hoặc tắt va chạm của đối tượng khi chạy thử. Có thể dùng lệnh tùy chỉnh collision Enemy off hoặc collision Enemy on; thiết lập gốc trong dự án không bị thay đổi.";
         if(s.contains("lệnh tùy chỉnh"))return "Thực hiện câu lệnh dạng văn bản ở ô lệnh tùy chỉnh bên dưới.";
         return "Đây là việc game sẽ làm khi khối được kích hoạt và điều kiện (nếu có) đúng.";
     }
