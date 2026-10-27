@@ -129,7 +129,7 @@ public class MainActivity extends Activity {
             project=loaded;
         }
         activeFile=new File(dir(),safe(project.optString("name","Imported"))+".gsproj");
-        resetProjectHistory();save();spriteCache.clear();tab=project.optString("dimension","2D");preview=false;selected=0;editor();toast("Đã nhập dự án và tài nguyên (nếu có)");
+        ensureSceneStructure();resetProjectHistory();save();resetProjectHistory();spriteCache.clear();tab=project.optString("dimension","2D");preview=false;selected=0;editor();toast("Đã nhập dự án và tài nguyên (nếu có)");
     }
     LinearLayout col(){LinearLayout l=new LinearLayout(this);l.setOrientation(LinearLayout.VERTICAL);l.setPadding(dp(12),dp(8),dp(12),dp(12));l.setBackgroundColor(bg);return l;}
     LinearLayout row(){LinearLayout l=new LinearLayout(this);l.setOrientation(LinearLayout.HORIZONTAL);l.setGravity(Gravity.CENTER_VERTICAL);return l;}
@@ -171,7 +171,7 @@ public class MainActivity extends Activity {
             JSONArray vars=new JSONArray();vars.put(variable("Score",0));vars.put(variable("Lives",3));vars.put(variable("Timer",0));project.put("variables",vars);
             JSONArray ev=new JSONArray();ev.put(event("Khi bắt đầu cảnh","Đặt biến Score = 0"));
             ev.put(event(dimension.equals("2D")?"Khi Player chạm Coin":"Khi bắt đầu cảnh",dimension.equals("2D")?"Tăng Score thêm 1 và ẩn Coin":"Đặt Camera nhìn vào Cube"));project.put("events",ev);
-            activeFile=new File(dir(),safe(n)+".gsproj");tab=dimension;resetProjectHistory();save();selected=0;editor();
+            ensureSceneStructure();activeFile=new File(dir(),safe(n)+".gsproj");tab=dimension;resetProjectHistory();save();selected=0;editor();
         }catch(Exception e){toast("Lỗi tạo dự án: "+e.getMessage());}
     }
 
@@ -227,7 +227,7 @@ public class MainActivity extends Activity {
                 ev.put(templateEvent("Khi điều kiện chuyển thành đúng","Lệnh tùy chỉnh (xem ô bên dưới)","add Level 1","Score >= Level * 10"));
             }
             project.put("events",ev);
-            activeFile=new File(dir(),safe(n)+".gsproj");tab="2D";preview=false;selected=0;resetProjectHistory();save();editor();
+            ensureSceneStructure();activeFile=new File(dir(),safe(n)+".gsproj");tab="2D";preview=false;selected=0;resetProjectHistory();save();editor();
             toast(shooter?"Đã tạo mẫu Bắn súng 2D":tower?"Đã tạo mẫu Tower Defense":"Đã tạo mẫu RPG sinh tồn");
         }catch(Exception e){toast("Không tạo được mẫu game: "+e.getMessage());}
     }
@@ -660,7 +660,202 @@ public class MainActivity extends Activity {
         return b;
     }
     JSONObject read(File f)throws Exception{ByteArrayOutputStream b=new ByteArrayOutputStream();try(InputStream in=new FileInputStream(f)){byte[] buf=new byte[4096];int n;while((n=in.read(buf))>0)b.write(buf,0,n);}return new JSONObject(b.toString("UTF-8"));}
-    void open(File f){try{project=read(f);activeFile=f;resetProjectHistory();tab=project.optString("dimension","2D");preview=false;selected=0;editor();}catch(Exception e){toast("Không mở được dự án");}}
+    void open(File f){try{project=read(f);activeFile=f;ensureSceneStructure();resetProjectHistory();save();resetProjectHistory();tab=project.optString("dimension","2D");preview=false;selected=0;editor();}catch(Exception e){toast("Không mở được dự án");}}
+
+    String activeSceneName(){
+        if(project==null)return "Scene 1";
+        String name=project.optString("activeSceneName","Scene 1").trim();
+        return name.isEmpty()?"Scene 1":name;
+    }
+    JSONArray projectScenes(){
+        if(project==null)return new JSONArray();
+        JSONArray scenes=project.optJSONArray("scenes");
+        if(scenes==null){scenes=new JSONArray();try{project.put("scenes",scenes);}catch(Exception ignored){}}
+        return scenes;
+    }
+    int sceneIndexByName(JSONArray scenes,String name){
+        if(scenes==null||name==null)return -1;
+        for(int i=0;i<scenes.length();i++){JSONObject scene=scenes.optJSONObject(i);if(scene!=null&&scene.optString("name","").equalsIgnoreCase(name.trim()))return i;}
+        return -1;
+    }
+    JSONArray copyProjectArray(String key)throws JSONException{
+        JSONArray value=project.optJSONArray(key);
+        return value==null?new JSONArray():new JSONArray(value.toString());
+    }
+    JSONObject snapshotCurrentScene(String name)throws JSONException{
+        JSONObject scene=new JSONObject();
+        scene.put("name",name);
+        scene.put("dimension",project.optString("dimension","2D"));
+        scene.put("width",project.optInt("width",960));
+        scene.put("height",project.optInt("height",540));
+        scene.put("backgroundColor",project.optInt("backgroundColor",Color.rgb(100,180,242)));
+        scene.put("objects",copyProjectArray("objects"));
+        scene.put("events",copyProjectArray("events"));
+        scene.put("variables",copyProjectArray("variables"));
+        return scene;
+    }
+    void syncActiveSceneData(){
+        if(project==null)return;
+        try{
+            JSONArray scenes=projectScenes();
+            String name=activeSceneName();
+            JSONObject snapshot=snapshotCurrentScene(name);
+            int index=sceneIndexByName(scenes,name);
+            if(index>=0)scenes.put(index,snapshot);else scenes.put(snapshot);
+            project.put("scenes",scenes);
+            project.put("activeSceneName",name);
+        }catch(Exception e){toast("Không lưu được dữ liệu cảnh");}
+    }
+    void loadSceneIntoProject(JSONObject scene)throws JSONException{
+        if(project==null||scene==null)throw new JSONException("Cảnh không hợp lệ");
+        String name=scene.optString("name","Scene 1").trim();
+        project.put("activeSceneName",name.isEmpty()?"Scene 1":name);
+        project.put("dimension",scene.optString("dimension","2D"));
+        project.put("width",scene.optInt("width",960));
+        project.put("height",scene.optInt("height",540));
+        project.put("backgroundColor",scene.optInt("backgroundColor",Color.rgb(100,180,242)));
+        JSONArray os=scene.optJSONArray("objects"),ev=scene.optJSONArray("events"),vars=scene.optJSONArray("variables");
+        project.put("objects",os==null?new JSONArray():new JSONArray(os.toString()));
+        project.put("events",ev==null?new JSONArray():new JSONArray(ev.toString()));
+        project.put("variables",vars==null?new JSONArray():new JSONArray(vars.toString()));
+    }
+    void ensureSceneStructure(){
+        if(project==null)return;
+        JSONArray scenes=project.optJSONArray("scenes");
+        if(scenes==null||scenes.length()==0){
+            try{project.put("activeSceneName","Scene 1");syncActiveSceneData();}catch(Exception e){toast("Không thể tạo cảnh mặc định");}
+            return;
+        }
+        String name=project.optString("activeSceneName","").trim();
+        int activeIndex=sceneIndexByName(scenes,name);
+        if(activeIndex<0){
+            JSONObject first=scenes.optJSONObject(0);
+            if(first!=null){
+                try{loadSceneIntoProject(first);}catch(Exception e){toast("Không đọc được cảnh đã lưu");}
+            }else{
+                try{project.put("activeSceneName","Scene 1");}catch(Exception ignored){}
+            }
+        }
+        syncActiveSceneData();
+    }
+    String uniqueSceneName(String preferred,JSONArray scenes,int exceptIndex){
+        String base=preferred==null?"":preferred.trim();
+        if(base.isEmpty())base="Scene";
+        if(base.length()>50)base=base.substring(0,50);
+        boolean clash=false;
+        for(int i=0;i<scenes.length();i++){if(i==exceptIndex)continue;JSONObject scene=scenes.optJSONObject(i);if(scene!=null&&scene.optString("name","").equalsIgnoreCase(base)){clash=true;break;}}
+        if(!clash)return base;
+        for(int i=2;i<10000;i++){
+            String suffix=" "+i;String candidate=base.substring(0,Math.min(base.length(),50-suffix.length()))+suffix;
+            boolean used=false;for(int j=0;j<scenes.length();j++){if(j==exceptIndex)continue;JSONObject scene=scenes.optJSONObject(j);if(scene!=null&&scene.optString("name","").equalsIgnoreCase(candidate)){used=true;break;}}
+            if(!used)return candidate;
+        }
+        return "Scene "+System.currentTimeMillis();
+    }
+    void activateSceneAt(int index){
+        JSONArray scenes=projectScenes();
+        if(index<0||index>=scenes.length())return;
+        syncActiveSceneData();
+        JSONObject target=scenes.optJSONObject(index);
+        if(target==null){toast("Cảnh không hợp lệ");return;}
+        try{
+            loadSceneIntoProject(target);
+            stopRuntime();preview=false;selected=0;tab=project.optString("dimension","2D");
+            save();editor();toast("Đã mở cảnh "+activeSceneName());
+        }catch(Exception e){toast("Không thể mở cảnh này");}
+    }
+    void createNewScene(){
+        JSONArray scenes=projectScenes();
+        if(scenes.length()>=100){toast("Dự án đã đạt giới hạn 100 cảnh");return;}
+        syncActiveSceneData();
+        try{
+            JSONObject scene=new JSONObject();
+            String name=uniqueSceneName("Scene "+(scenes.length()+1),scenes,-1);
+            scene.put("name",name);scene.put("dimension",project.optString("dimension","2D"));
+            scene.put("width",sceneWidth());scene.put("height",sceneHeight());
+            scene.put("backgroundColor",sceneBackgroundColor());
+            scene.put("objects",new JSONArray());
+            JSONArray vars=new JSONArray();vars.put(variable("Score",0));vars.put(variable("Lives",3));vars.put(variable("Timer",0));scene.put("variables",vars);
+            JSONArray events=new JSONArray();events.put(event("Khi bắt đầu cảnh","Đặt biến Score = 0"));scene.put("events",events);
+            scenes.put(scene);project.put("scenes",scenes);
+            loadSceneIntoProject(scene);stopRuntime();preview=false;selected=0;tab=project.optString("dimension","2D");
+            save();editor();toast("Đã tạo cảnh "+name);
+        }catch(Exception e){toast("Không tạo được cảnh mới: "+e.getMessage());}
+    }
+    void duplicateSceneAt(int index){
+        JSONArray scenes=projectScenes();
+        if(index<0||index>=scenes.length())return;
+        if(scenes.length()>=100){toast("Dự án đã đạt giới hạn 100 cảnh");return;}
+        syncActiveSceneData();
+        JSONObject source=scenes.optJSONObject(index);
+        if(source==null)return;
+        try{
+            JSONObject copy=new JSONObject(source.toString());
+            String name=uniqueSceneName(source.optString("name","Scene")+" copy",scenes,-1);
+            copy.put("name",name);scenes.put(copy);project.put("scenes",scenes);
+            save();editor();toast("Đã nhân bản thành cảnh "+name);
+        }catch(Exception e){toast("Không nhân bản được cảnh");}
+    }
+    void renameSceneAt(int index){
+        JSONArray scenes=projectScenes();
+        if(index<0||index>=scenes.length())return;
+        syncActiveSceneData();
+        JSONObject scene=scenes.optJSONObject(index);if(scene==null)return;
+        String oldName=scene.optString("name","Scene");
+        EditText name=field(oldName);
+        new AlertDialog.Builder(this).setTitle("Đổi tên cảnh").setView(name).setNegativeButton("Hủy",null).setPositiveButton("Lưu",(d,w)->{
+            String requested=name.getText().toString().trim();
+            if(requested.isEmpty()||requested.length()>50){toast("Tên cảnh cần từ 1 đến 50 ký tự");return;}
+            String unique=uniqueSceneName(requested,scenes,index);
+            try{
+                scene.put("name",unique);
+                if(activeSceneName().equalsIgnoreCase(oldName))project.put("activeSceneName",unique);
+                syncActiveSceneData();save();editor();toast("Đã đổi tên cảnh thành "+unique);
+            }catch(Exception e){toast("Không đổi được tên cảnh");}
+        }).show();
+    }
+    void deleteSceneAt(int index){
+        JSONArray scenes=projectScenes();
+        if(index<0||index>=scenes.length())return;
+        if(scenes.length()<=1){toast("Dự án phải có ít nhất một cảnh");return;}
+        JSONObject target=scenes.optJSONObject(index);
+        String name=target==null?"cảnh này":target.optString("name","cảnh này");
+        new AlertDialog.Builder(this).setTitle("Xóa cảnh")
+            .setMessage("Xóa cảnh \""+name+"\"? Không thể khôi phục nếu không dùng Hoàn tác.")
+            .setNegativeButton("Hủy",null).setPositiveButton("Xóa",(d,w)->{
+                try{
+                    syncActiveSceneData();
+                    scenes.remove(index);project.put("scenes",scenes);
+                    if(activeSceneName().equalsIgnoreCase(name)){
+                        int next=Math.min(index,scenes.length()-1);
+                        loadSceneIntoProject(scenes.optJSONObject(next));
+                        stopRuntime();preview=false;selected=0;tab=project.optString("dimension","2D");
+                    }
+                    save();editor();toast("Đã xóa cảnh "+name);
+                }catch(Exception e){toast("Không thể xóa cảnh");}
+            }).show();
+    }
+    void scenePanel(LinearLayout root){
+        root.addView(label("Cảnh trong dự án",18,fg,true));
+        root.addView(label("Mỗi cảnh có đối tượng, sự kiện, biến, kích thước và màu nền riêng. Chạm cảnh để mở.",12,muted,false));
+        syncActiveSceneData();
+        JSONArray scenes=projectScenes();
+        for(int i=0;i<scenes.length();i++){
+            JSONObject scene=scenes.optJSONObject(i);if(scene==null)continue;
+            int index=i;String name=scene.optString("name","Scene "+(i+1));
+            JSONArray sceneObjects=scene.optJSONArray("objects");
+            TextView tile=card((name.equalsIgnoreCase(activeSceneName())?"▶ ":"🎬 ")+name+"\n"+scene.optString("dimension","2D")+" • "+(sceneObjects==null?0:sceneObjects.length())+" đối tượng"+(name.equalsIgnoreCase(activeSceneName())?" • Đang mở":""));
+            root.addView(tile);tile.setOnClickListener(v->{if(!name.equalsIgnoreCase(activeSceneName()))activateSceneAt(index);});
+            LinearLayout controls=row();
+            controls.addView(btn("Mở",()->activateSceneAt(index)));
+            controls.addView(btn("Nhân bản",()->duplicateSceneAt(index)));
+            controls.addView(btn("Đổi tên",()->renameSceneAt(index)));
+            controls.addView(btn("Xóa",()->deleteSceneAt(index)));
+            HorizontalScrollView scroll=new HorizontalScrollView(this);scroll.setHorizontalScrollBarEnabled(false);scroll.addView(controls);root.addView(scroll);
+        }
+        root.addView(btn("+ Tạo cảnh mới",this::createNewScene));
+    }
+
     void resetProjectHistory(){
         undoHistory.clear();redoHistory.clear();
         lastSavedSnapshot=project==null?null:project.toString();
@@ -679,6 +874,7 @@ public class MainActivity extends Activity {
     }
     void save(){
         if(project==null||activeFile==null)return;
+        syncActiveSceneData();
         String current=project.toString();
         try(FileOutputStream out=new FileOutputStream(activeFile)){
             out.write(project.toString(2).getBytes(StandardCharsets.UTF_8));
@@ -844,7 +1040,7 @@ public class MainActivity extends Activity {
         Button undo=btn("↶ Hoàn tác "+undoHistory.size(),this::undoProject);undo.setEnabled(!undoHistory.isEmpty());history.addView(undo);
         Button redo=btn("↷ Làm lại "+redoHistory.size(),this::redoProject);redo.setEnabled(!redoHistory.isEmpty());history.addView(redo);
         root.addView(history);
-        LinearLayout tabs=row();for(String t:new String[]{"2D","3D","Đối tượng","Sự kiện","Biến"})tabs.addView(btn(t,()->{tab=t;editor();}));root.addView(scroll(tabs));
+        LinearLayout tabs=row();for(String t:new String[]{"2D","3D","Cảnh","Đối tượng","Sự kiện","Biến"})tabs.addView(btn(t,()->{tab=t;editor();}));root.addView(scroll(tabs));
         root.addView(btn("✓ Kiểm tra dự án",this::validateProject));
         if(preview){
             boolean preview3D=project.optString("dimension","2D").equals("3D");
@@ -875,7 +1071,7 @@ public class MainActivity extends Activity {
             quickObjectTools.addView(btn(activeSelection!=null&&activeSelection.optBoolean("locked",false)?"Mở khóa kéo":"Khóa kéo",this::toggleSelectedLock));
             root.addView(quickObjectTools);
             root.addView(btn("Sửa thuộc tính",this::editObject));root.addView(btn("Xuất dự án ZIP",this::exportZip));root.addView(btn("Xuất APK",this::apkNotice));
-        }else if(tab.equals("Đối tượng"))objectPanel(root);else if(tab.equals("Sự kiện"))eventPanel(root);else variablePanel(root);
+        }else if(tab.equals("Cảnh"))scenePanel(root);else if(tab.equals("Đối tượng"))objectPanel(root);else if(tab.equals("Sự kiện"))eventPanel(root);else variablePanel(root);
         setContentView(scroll(root));
     }
     JSONObject selectedObject(){JSONArray a=objects();if(a.length()==0)return null;selected=Math.max(0,Math.min(selected,a.length()-1));return a.optJSONObject(selected);}
