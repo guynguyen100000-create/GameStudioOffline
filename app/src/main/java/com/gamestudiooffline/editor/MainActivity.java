@@ -1265,24 +1265,46 @@ public class MainActivity extends Activity {
         JSONArray a=project.optJSONArray("events");
         if(a!=null)for(int i=0;i<a.length();i++){
             int idx=i;JSONObject e=a.optJSONObject(i);
+            LinearLayout eventCard=col();
+            eventCard.setPadding(dp(8),dp(6),dp(8),dp(8));
+            GradientDrawable eventBg=new GradientDrawable();eventBg.setColor(panel);eventBg.setCornerRadius(dp(12));eventCard.setBackground(eventBg);
+            TextView dragHandle=label("⠿  Nhấn giữ rồi kéo để đổi vị trí sự kiện",12,muted,true);
+            dragHandle.setGravity(Gravity.CENTER_VERTICAL);eventCard.addView(dragHandle);
+            dragHandle.setOnLongClickListener(v->{
+                ClipData dragData=ClipData.newPlainText("event-index",String.valueOf(idx));
+                return v.startDrag(dragData,new View.DragShadowBuilder(v),Integer.valueOf(idx),0);
+            });
+            eventCard.setOnDragListener((view,dragEvent)->{
+                if(dragEvent.getAction()==DragEvent.ACTION_DRAG_STARTED)return dragEvent.getLocalState() instanceof Integer;
+                if(dragEvent.getAction()==DragEvent.ACTION_DRAG_ENTERED){view.setAlpha(.72f);return true;}
+                if(dragEvent.getAction()==DragEvent.ACTION_DRAG_EXITED){view.setAlpha(1f);return true;}
+                if(dragEvent.getAction()==DragEvent.ACTION_DROP){
+                    view.setAlpha(1f);
+                    Object state=dragEvent.getLocalState();
+                    if(state instanceof Integer)moveEventTo((Integer)state,idx);
+                    return true;
+                }
+                if(dragEvent.getAction()==DragEvent.ACTION_DRAG_ENDED){view.setAlpha(1f);return true;}
+                return true;
+            });
             String trigger=e.optString("trigger","");
             String shownAction=e.optString("customAction","").trim();if(shownAction.isEmpty())shownAction=e.optString("action","");
             String cond=e.optString("condition","").trim();
             TextView triggerBlock=scratchBlock("🟨  KHI",trigger,Color.rgb(190,130,18));
-            root.addView(triggerBlock);triggerBlock.setOnClickListener(v->editEvent(idx));
+            eventCard.addView(triggerBlock);triggerBlock.setOnClickListener(v->editEvent(idx));
             TextView explanation=label(explainTrigger(trigger),12,muted,false);
-            explanation.setPadding(dp(14),dp(5),dp(8),dp(5));root.addView(explanation);
+            explanation.setPadding(dp(14),dp(5),dp(8),dp(5));eventCard.addView(explanation);
             if(!cond.isEmpty()){
-                TextView connector=label("          ⋮",18,muted,true);root.addView(connector);
+                TextView connector=label("          ⋮",18,muted,true);eventCard.addView(connector);
                 TextView conditionBlock=scratchBlock("🔎  NẾU",cond,Color.rgb(32,120,190));
-                root.addView(conditionBlock);conditionBlock.setOnClickListener(v->editEvent(idx));
-                TextView conditionHint=label(explainCondition(cond),12,muted,false);conditionHint.setPadding(dp(14),dp(5),dp(8),dp(5));root.addView(conditionHint);
+                eventCard.addView(conditionBlock);conditionBlock.setOnClickListener(v->editEvent(idx));
+                TextView conditionHint=label(explainCondition(cond),12,muted,false);conditionHint.setPadding(dp(14),dp(5),dp(8),dp(5));eventCard.addView(conditionHint);
             }
-            TextView connector=label("          ⋮",18,muted,true);root.addView(connector);
+            TextView connector=label("          ⋮",18,muted,true);eventCard.addView(connector);
             TextView actionBlock=scratchBlock("🟦  LÀM",shownAction,Color.rgb(36,145,91));
-            root.addView(actionBlock);actionBlock.setOnClickListener(v->editEvent(idx));
-            TextView actionHint=label(explainAction(shownAction),12,muted,false);actionHint.setPadding(dp(14),dp(5),dp(8),dp(5));root.addView(actionHint);
-            TextView edit=label("✎ Chạm các khối để sửa  •  Nhấn giữ để xóa cả sự kiện",11,muted,false);root.addView(edit);
+            eventCard.addView(actionBlock);actionBlock.setOnClickListener(v->editEvent(idx));
+            TextView actionHint=label(explainAction(shownAction),12,muted,false);actionHint.setPadding(dp(14),dp(5),dp(8),dp(5));eventCard.addView(actionHint);
+            TextView edit=label("✎ Chạm các khối để sửa  •  Nhấn giữ để xóa cả sự kiện",11,muted,false);eventCard.addView(edit);
             edit.setOnLongClickListener(v->{new AlertDialog.Builder(this).setMessage("Xóa khối sự kiện này?").setNegativeButton("Hủy",null).setPositiveButton("Xóa",(d,w)->{project.optJSONArray("events").remove(idx);save();editor();}).show();return true;});
             triggerBlock.setOnLongClickListener(v->{new AlertDialog.Builder(this).setMessage("Xóa khối sự kiện này?").setNegativeButton("Hủy",null).setPositiveButton("Xóa",(d,w)->{project.optJSONArray("events").remove(idx);save();editor();}).show();return true;});
             actionBlock.setOnLongClickListener(v->{new AlertDialog.Builder(this).setMessage("Xóa khối sự kiện này?").setNegativeButton("Hủy",null).setPositiveButton("Xóa",(d,w)->{project.optJSONArray("events").remove(idx);save();editor();}).show();return true;});
@@ -1293,7 +1315,8 @@ public class MainActivity extends Activity {
             HorizontalScrollView eventControlScroll=new HorizontalScrollView(this);
             eventControlScroll.setHorizontalScrollBarEnabled(false);
             eventControlScroll.addView(eventControls);
-            root.addView(eventControlScroll);
+            eventCard.addView(eventControlScroll);
+            root.addView(eventCard);
         }
         root.addView(btn("+ Thêm khối sự kiện",()->editEvent(-1)));
         root.addView(btn("📚 Thư viện mẫu sự kiện",this::showEventTemplateLibrary));
@@ -1349,6 +1372,25 @@ public class MainActivity extends Activity {
             editor();
             toast("Đã đổi thứ tự sự kiện");
         }catch(Exception e){toast("Không thể đổi thứ tự: "+e.getMessage());}
+    }
+
+    void moveEventTo(int from,int to){
+        JSONArray list=project.optJSONArray("events");
+        if(list==null||from<0||to<0||from>=list.length()||to>=list.length())return;
+        if(from==to)return;
+        try{
+            Object moving=list.opt(from);
+            JSONArray reordered=new JSONArray();
+            for(int i=0;i<list.length();i++){
+                if(i==from)continue;
+                if(from<to&&i==to)reordered.put(moving);
+                reordered.put(list.opt(i));
+                if(from>to&&i==to)reordered.put(moving);
+            }
+            if(to==list.length()-1&&from<to)reordered.put(moving);
+            project.put("events",reordered);
+            save();editor();toast("Đã kéo đổi vị trí sự kiện");
+        }catch(Exception e){toast("Không thể đổi vị trí sự kiện");}
     }
 
     void duplicateEvent(int index){
