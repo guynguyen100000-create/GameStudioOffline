@@ -392,6 +392,7 @@ public class MainActivity extends Activity {
             else if("right".equals(phase))match=trigger.contains("bấm nút phải");
             else if("jump".equals(phase))match=trigger.contains("bấm nút nhảy")||trigger.contains("nút nhảy");
             else if("shoot".equals(phase))match=trigger.contains("bấm nút bắn")||trigger.contains("nút bắn");
+            else if("playerObjectCollision".equals(phase))match=trigger.contains("hai đối tượng chạm nhau");
             else if("objectCollision".equals(phase)){match=trigger.contains("chạm")&&contactType!=null;if(match&&!trigger.contains("hai đối tượng")){String[] types=contactType.split("\\|");match=types.length==2&&trigger.contains(types[0])&&trigger.contains(types[1]);}}
             else if("collision".equals(phase))match=trigger.contains("chạm")&&contactType!=null&&(trigger.contains(contactType.toLowerCase(Locale.ROOT))||trigger.contains("bất kỳ đối tượng nào"));
             if(match&&!condition.isEmpty()&&!trigger.contains("điều kiện chuyển thành đúng")&&!trigger.contains("trong khi điều kiện đúng"))match=evaluateCondition(condition);
@@ -658,7 +659,19 @@ public class MainActivity extends Activity {
                 boolean overlap=runtimePlayerX<ox+ow&&runtimePlayerX+pw>ox&&runtimePlayerY<oy+oh&&runtimePlayerY+ph>oy;
                 boolean landedOnThisPlatform=type.equals("platform")&&runtimePlayerVY>=0&&oldBottom<=oy+12&&runtimePlayerY+ph>=oy&&runtimePlayerX+pw>ox&&runtimePlayerX<ox+ow;
                 if(landedOnThisPlatform){runtimePlayerY=oy-ph;runtimePlayerVY=0;runtimeGrounded=true;}
-                if(overlap&&!type.equals("camera")&&!type.equals("light")&&!type.equals("player")){String key=type+":"+name;currentContacts.add(key);if(!previousContacts.contains(key))executePhase("collision",type);}
+                if(overlap&&!type.equals("camera")&&!type.equals("light")&&!type.equals("player")){
+                    String key=type+":"+name;currentContacts.add(key);
+                    if(!previousContacts.contains(key)){
+                        lastObjectCollisionA=player.optString("name","Player");
+                        lastObjectCollisionB=name;
+                        lastObjectCollisionTypeA="player";
+                        lastObjectCollisionTypeB=type;
+                        executePhase("playerObjectCollision","player|"+type);
+                        if(applyPendingRuntimeScene())return;
+                        executePhase("collision",type);
+                        if(applyPendingRuntimeScene())return;
+                    }
+                }
             }
         }
         for(int i=0;i<all.length();i++){JSONObject a=all.optJSONObject(i);if(a==null)continue;String nameA=a.optString("name","Object"),typeA=a.optString("type","").toLowerCase(Locale.ROOT);if(typeA.equals("player")||typeA.equals("camera")||typeA.equals("light")||hiddenRuntimeObjects.contains(nameA)||destroyedRuntimeObjects.contains(nameA)||!runtimeObjectCollisionEnabled(a))continue;double ax=runtimeObjectCoordinate(a,true),ay=runtimeObjectCoordinate(a,false),aw=Math.max(1,a.optDouble("w",1)),ah=Math.max(1,a.optDouble("h",1));for(int j=i+1;j<all.length();j++){JSONObject b=all.optJSONObject(j);if(b==null)continue;String nameB=b.optString("name","Object"),typeB=b.optString("type","").toLowerCase(Locale.ROOT);if(typeB.equals("player")||typeB.equals("camera")||typeB.equals("light")||hiddenRuntimeObjects.contains(nameB)||destroyedRuntimeObjects.contains(nameB)||!runtimeObjectCollisionEnabled(b))continue;double bx=runtimeObjectCoordinate(b,true),by=runtimeObjectCoordinate(b,false),bw=Math.max(1,b.optDouble("w",1)),bh=Math.max(1,b.optDouble("h",1));boolean overlap=ax<bx+bw&&ax+aw>bx&&ay<by+bh&&ay+ah>by;if(overlap){String key="pair:"+nameA+":"+nameB;currentContacts.add(key);if(!previousContacts.contains(key)){lastObjectCollisionA=nameA;lastObjectCollisionB=nameB;lastObjectCollisionTypeA=typeA;lastObjectCollisionTypeB=typeB;executePhase("objectCollision",typeA+"|"+typeB);if(destroyedRuntimeObjects.contains(nameA)||destroyedRuntimeObjects.contains(nameB))break;}}}}
