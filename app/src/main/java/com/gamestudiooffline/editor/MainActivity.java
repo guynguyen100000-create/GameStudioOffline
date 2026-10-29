@@ -1379,15 +1379,12 @@ public class MainActivity extends Activity {
         if(list==null||from<0||to<0||from>=list.length()||to>=list.length())return;
         if(from==to)return;
         try{
-            Object moving=list.opt(from);
+            ArrayList<Object> items=new ArrayList<>();
+            for(int i=0;i<list.length();i++)items.add(list.opt(i));
+            Object moving=items.remove(from);
+            items.add(to,moving);
             JSONArray reordered=new JSONArray();
-            for(int i=0;i<list.length();i++){
-                if(i==from)continue;
-                if(from<to&&i==to)reordered.put(moving);
-                reordered.put(list.opt(i));
-                if(from>to&&i==to)reordered.put(moving);
-            }
-            if(to==list.length()-1&&from<to)reordered.put(moving);
+            for(Object item:items)reordered.put(item);
             project.put("events",reordered);
             save();editor();toast("Đã kéo đổi vị trí sự kiện");
         }catch(Exception e){toast("Không thể đổi vị trí sự kiện");}
