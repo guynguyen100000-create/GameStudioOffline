@@ -262,6 +262,7 @@ public class MainActivity extends Activity {
     boolean runtimeGrounded=false, jumpRequested=false, runtimeStarted=false, runtimeGameOver=false;
     int runtimeScore=0, runtimeLives=3;
     long lastRuntimeTick=0, runtimeStartMillis=0;
+    String pendingRuntimeSceneName="";
 
     void startRuntime(){
         runtimeCollisionOverrides.clear();
@@ -279,7 +280,31 @@ public class MainActivity extends Activity {
         lastRuntimeTick=System.currentTimeMillis();runtimeStartMillis=lastRuntimeTick;runtimeStarted=true;
         executePhase("start",null);
     }
-    void stopRuntime(){runtimeStarted=false;moveAxis=0;leftButtonHeld=false;rightButtonHeld=false;jumpRequested=false;hiddenRuntimeObjects.clear();destroyedRuntimeObjects.clear();previousContacts.clear();runtimeSpawnedObjects.clear();runtimeSpawnCounter=0;runtimeFollowSpeed.clear();runtimeObjectX.clear();runtimeObjectY.clear();runtimeObjectVX.clear();runtimeObjectVY.clear();runtimeObjectHealth.clear();runtimeObjectAngle.clear();runtimeObjectOpacity.clear();runtimeCollisionOverrides.clear();}
+    void stopRuntime(){runtimeStarted=false;pendingRuntimeSceneName="";moveAxis=0;leftButtonHeld=false;rightButtonHeld=false;jumpRequested=false;hiddenRuntimeObjects.clear();destroyedRuntimeObjects.clear();previousContacts.clear();runtimeSpawnedObjects.clear();runtimeSpawnCounter=0;runtimeFollowSpeed.clear();runtimeObjectX.clear();runtimeObjectY.clear();runtimeObjectVX.clear();runtimeObjectVY.clear();runtimeObjectHealth.clear();runtimeObjectAngle.clear();runtimeObjectOpacity.clear();runtimeCollisionOverrides.clear();}
+
+    boolean applyPendingRuntimeScene(){
+        String requested=pendingRuntimeSceneName==null?"":pendingRuntimeSceneName.trim();
+        if(requested.isEmpty())return false;
+        pendingRuntimeSceneName="";
+        if(project==null||requested.equalsIgnoreCase(activeSceneName()))return false;
+        syncActiveSceneData();
+        JSONArray scenes=projectScenes();
+        int index=sceneIndexByName(scenes,requested);
+        if(index<0){toast("Không tìm thấy cảnh: "+requested);return false;}
+        JSONObject target=scenes.optJSONObject(index);
+        if(target==null){toast("Dữ liệu cảnh không hợp lệ: "+requested);return false;}
+        try{
+            loadSceneIntoProject(target);
+            stopRuntime();
+            startRuntime();
+            toast("Đã chuyển sang cảnh "+activeSceneName());
+            if(preview)runOnUiThread(()->{if(preview)editor();});
+            return true;
+        }catch(Exception ex){
+            toast("Không thể chuyển sang cảnh "+requested);
+            return false;
+        }
+    }
     JSONArray runtimeSceneObjects(){JSONArray all=new JSONArray();JSONArray base=objects();for(int i=0;i<base.length();i++){JSONObject o=base.optJSONObject(i);if(o!=null)all.put(o);}for(JSONObject o:runtimeSpawnedObjects)if(o!=null)all.put(o);return all;}
     boolean runtimeTargetMatches(JSONObject o,String query,JSONArray all){
         String q=query.trim().toLowerCase(Locale.ROOT),name=o.optString("name","").toLowerCase(Locale.ROOT),type=o.optString("type","").toLowerCase(Locale.ROOT);boolean exactNameExists=false;
@@ -520,6 +545,14 @@ public class MainActivity extends Activity {
         Matcher collision=Pattern.compile("(?i)^(?:collision|setcollision)\\s+(.+?)\\s+(on|off|true|false|1|0|enable|disable)$").matcher(command);
         Matcher localizedCollision=Pattern.compile("(?i)^(bật|tắt)\\s+va chạm\\s+(.+)$").matcher(command);
         Matcher localizedVisibility=Pattern.compile("(?i)^(ẩn|hiện)\\s+(.+)$").matcher(command);
+        Matcher sceneTransition=Pattern.compile("(?i)^chuyển\\s+(?:sang|tới)\\s+cảnh\\s*:?\\s*(.+)$").matcher(command);
+        Matcher customSceneTransition=Pattern.compile("(?i)^(?:scene|goto|changescene|change\\s+scene)\\s+(.+)$").matcher(command);
+        if(sceneTransition.matches()||customSceneTransition.matches()){
+            String requested=(sceneTransition.matches()?sceneTransition.group(1):customSceneTransition.group(1)).trim();
+            if(!requested.isEmpty())pendingRuntimeSceneName=requested;
+            else toast("Hãy nhập tên cảnh cần chuyển tới");
+            return;
+        }
         if(customSet.matches()){
             String key=customSet.group(1);Double calculated=resolveValue(customSet.group(2));if(calculated==null)return;
             setRuntimeValue(key,calculated);updateHudValues();return;
@@ -594,13 +627,15 @@ public class MainActivity extends Activity {
     void tickRuntime(){
         if(!runtimeStarted)startRuntime();
         if(runtimeGameOver)return;
+        if(applyPendingRuntimeScene())return;
         long now=System.currentTimeMillis();double dt=Math.min(.05,Math.max(.001,(now-lastRuntimeTick)/1000d));lastRuntimeTick=now;
         JSONObject player=findPlayer();
         executePhase("frame",null);
+        if(applyPendingRuntimeScene())return;
         boolean playerActive=player!=null&&!hiddenRuntimeObjects.contains(player.optString("name",""))&&!destroyedRuntimeObjects.contains(player.optString("name",""));
         double pw=0,ph=0,oldBottom=runtimePlayerY;
         if(playerActive){
-            if(jumpRequested){executePhase("jump",null);if(runtimeGrounded){runtimePlayerVY=-runtimeJumpStrength;runtimeGrounded=false;}jumpRequested=false;}
+            if(jumpRequested){executePhase("jump",null);if(applyPendingRuntimeScene())return;if(runtimeGrounded){runtimePlayerVY=-runtimeJumpStrength;runtimeGrounded=false;}jumpRequested=false;}
             pw=Math.max(20,player.optDouble("w",48));ph=Math.max(20,player.optDouble("h",60));oldBottom=runtimePlayerY+ph;
         }else jumpRequested=false;
         dt*=runtimeTimeScale;
@@ -627,6 +662,7 @@ public class MainActivity extends Activity {
             }
         }
         for(int i=0;i<all.length();i++){JSONObject a=all.optJSONObject(i);if(a==null)continue;String nameA=a.optString("name","Object"),typeA=a.optString("type","").toLowerCase(Locale.ROOT);if(typeA.equals("player")||typeA.equals("camera")||typeA.equals("light")||hiddenRuntimeObjects.contains(nameA)||destroyedRuntimeObjects.contains(nameA)||!runtimeObjectCollisionEnabled(a))continue;double ax=runtimeObjectCoordinate(a,true),ay=runtimeObjectCoordinate(a,false),aw=Math.max(1,a.optDouble("w",1)),ah=Math.max(1,a.optDouble("h",1));for(int j=i+1;j<all.length();j++){JSONObject b=all.optJSONObject(j);if(b==null)continue;String nameB=b.optString("name","Object"),typeB=b.optString("type","").toLowerCase(Locale.ROOT);if(typeB.equals("player")||typeB.equals("camera")||typeB.equals("light")||hiddenRuntimeObjects.contains(nameB)||destroyedRuntimeObjects.contains(nameB)||!runtimeObjectCollisionEnabled(b))continue;double bx=runtimeObjectCoordinate(b,true),by=runtimeObjectCoordinate(b,false),bw=Math.max(1,b.optDouble("w",1)),bh=Math.max(1,b.optDouble("h",1));boolean overlap=ax<bx+bw&&ax+aw>bx&&ay<by+bh&&ay+ah>by;if(overlap){String key="pair:"+nameA+":"+nameB;currentContacts.add(key);if(!previousContacts.contains(key)){lastObjectCollisionA=nameA;lastObjectCollisionB=nameB;lastObjectCollisionTypeA=typeA;lastObjectCollisionTypeB=typeB;executePhase("objectCollision",typeA+"|"+typeB);if(destroyedRuntimeObjects.contains(nameA)||destroyedRuntimeObjects.contains(nameB))break;}}}}
+        if(applyPendingRuntimeScene())return;
         cleanupRuntimeSpawns();
         // Platforms handle landing above; do not force an invisible floor, so the player can fall off-screen.
         previousContacts.clear();previousContacts.addAll(currentContacts);
@@ -1321,7 +1357,7 @@ public class MainActivity extends Activity {
         root.addView(btn("+ Thêm khối sự kiện",()->editEvent(-1)));
         root.addView(btn("📚 Thư viện mẫu sự kiện",this::showEventTemplateLibrary));
         root.addView(label("Ví dụ: Score >= 10 nghĩa là điểm từ 10 trở lên. && yêu cầu cả hai điều kiện đúng; || chỉ cần một điều kiện đúng. Chọn “Khi điều kiện chuyển thành đúng” để chạy một lần khi điều kiện vừa đúng.",12,muted,false));
-        root.addView(label("Lệnh nâng cao: spawn Projectile at Player 260 0; follow Enemy Player 100; set Enemy.VX = 80; teleport Enemy 400 200; rotate Player 15 (xoay thêm 15°); angle Player 90 (đặt góc 90°); opacity Enemy 128 (trong suốt một nửa); add Score 5; subtract Lives 1; hide Coin; show Enemy; respawn Player.",12,muted,false));
+        root.addView(label("Lệnh nâng cao: spawn Projectile at Player 260 0; follow Enemy Player 100; set Enemy.VX = 80; teleport Enemy 400 200; rotate Player 15 (xoay thêm 15°); angle Player 90 (đặt góc 90°); opacity Enemy 128 (trong suốt một nửa); add Score 5; subtract Lives 1; hide Coin; show Enemy; respawn Player; scene Scene 2 để chuyển cảnh.",12,muted,false));
     }
     void showEventTemplateLibrary(){
         String[] groups={"Nền tảng 2D: khởi tạo người chơi","Nền tảng 2D: nhặt Coin","Nền tảng 2D: chạm Enemy mất mạng","Nền tảng 2D: rơi khỏi bản đồ hồi sinh","Bắn súng: bấm Bắn tạo đạn","Bắn súng: Projectile trúng Enemy","AI: Enemy đuổi theo Player","AI: Enemy dừng đuổi khi cần","Điểm số: đạt 10 điểm","Thời gian: tăng bộ đếm mỗi giây","RPG: khởi tạo máu và mạng","RPG: hồi máu khi nhặt vật phẩm","Điều khiển: di chuyển Player sang trái","Điều khiển: di chuyển Player sang phải","Ẩn/hiện: ẩn Coin khi bắt đầu","Ẩn/hiện: hiện Enemy khi bắt đầu"};
@@ -1410,25 +1446,45 @@ public class MainActivity extends Activity {
         }catch(Exception e){toast("Không thể sao chép sự kiện: "+e.getMessage());}
     }
 
+    String[] actionChoicesForEditor(){
+        ArrayList<String> choices=new ArrayList<>(Arrays.asList(actionChoices));
+        JSONArray scenes=projectScenes();
+        for(int i=0;i<scenes.length();i++){
+            JSONObject scene=scenes.optJSONObject(i);
+            if(scene==null)continue;
+            String name=scene.optString("name","").trim();
+            if(!name.isEmpty()){
+                String choice="Chuyển sang cảnh: "+name;
+                if(!choices.contains(choice))choices.add(choice);
+            }
+        }
+        return choices.toArray(new String[0]);
+    }
+
     void editEvent(int index){
         JSONArray existingEvents=project.optJSONArray("events");
         if(existingEvents==null){existingEvents=new JSONArray();try{project.put("events",existingEvents);}catch(Exception ignored){}}
         final JSONArray list=existingEvents;
         JSONObject old=index>=0&&index<list.length()?list.optJSONObject(index):new JSONObject();
+        String[] availableActions=actionChoicesForEditor();
+        if(old!=null&&!old.optString("action","").isEmpty()&&!Arrays.asList(availableActions).contains(old.optString("action"))){
+            availableActions=Arrays.copyOf(availableActions,availableActions.length+1);
+            availableActions[availableActions.length-1]=old.optString("action");
+        }
         Spinner trigger=new Spinner(this),action=new Spinner(this);
         trigger.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,triggerChoices));
-        action.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,actionChoices));
-        if(old!=null){for(int i=0;i<triggerChoices.length;i++)if(triggerChoices[i].equals(old.optString("trigger")))trigger.setSelection(i);for(int i=0;i<actionChoices.length;i++)if(actionChoices[i].equals(old.optString("action")))action.setSelection(i);}
+        action.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,availableActions));
+        if(old!=null){for(int i=0;i<triggerChoices.length;i++)if(triggerChoices[i].equals(old.optString("trigger")))trigger.setSelection(i);for(int i=0;i<availableActions.length;i++)if(availableActions[i].equals(old.optString("action")))action.setSelection(i);}
         EditText condition=field(old==null?"":old.optString("condition",""));
         condition.setHint("VD: Score >= 10 && Lives > 0");
         EditText customAction=field(old==null?"":old.optString("customAction",""));
-        customAction.setHint("Lệnh tùy chỉnh, để trống dùng lựa chọn phía trên");
+        customAction.setHint("Ví dụ: scene Scene 2 để chuyển cảnh; lệnh tùy chỉnh thay thế hành động đã chọn");
         LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);box.setPadding(dp(12),dp(8),dp(12),dp(8));
         box.addView(label("KHI — Thời điểm / sự kiện",13,muted,true));box.addView(trigger);
         box.addView(label("NẾU — Điều kiện bổ sung (có thể để trống)",13,muted,true));box.addView(condition);
         box.addView(label("LÀM — Hành động",13,muted,true));box.addView(action);
         box.addView(label("Lệnh tùy chỉnh (tùy chọn, thay thế hành động đã chọn)",13,muted,true));box.addView(customAction);
-        TextView hint=label("Ví dụ điều kiện: Score >= 10 && Lives > 0. Ví dụ lệnh: add Score 5 hoặc teleport Player 100 250.",11,muted,false);box.addView(hint);
+        TextView hint=label("Ví dụ điều kiện: Score >= 10 && Lives > 0. Lệnh: add Score 5, teleport Player 100 250 hoặc scene Scene 2 để chuyển cảnh.",11,muted,false);box.addView(hint);
         new AlertDialog.Builder(this).setTitle(index<0?"Tạo sự kiện":"Sửa sự kiện").setView(scroll(box)).setNegativeButton("Hủy",null).setPositiveButton("Lưu",(d,w)->{
             try{JSONObject e=new JSONObject();e.put("trigger",trigger.getSelectedItem().toString());e.put("action",action.getSelectedItem().toString());e.put("condition",condition.getText().toString().trim());e.put("customAction",customAction.getText().toString().trim());if(index>=0&&index<list.length())list.put(index,e);else list.put(e);save();editor();}catch(Exception ex){toast("Không lưu được sự kiện");}
         }).show();
@@ -1452,7 +1508,7 @@ public class MainActivity extends Activity {
     class SceneView extends View{
         Paint p=new Paint(3);boolean run,three;float dx,dy;double sx,sy;boolean drag,resizing;double initialWidth=1,initialHeight=1;
         SceneView(boolean r,boolean d){super(MainActivity.this);run=r;three=d;setBackgroundColor(bg);}
-        @Override protected void onDraw(Canvas c){super.onDraw(c);c.drawColor(Color.rgb(20,33,51));if(run)tickRuntime();int sw=sceneWidth(),sh=sceneHeight();float scale=Math.min(getWidth()/(float)sw,getHeight()/(float)sh);if(scale<=0)return;c.save();c.translate((getWidth()-sw*scale)/2,(getHeight()-sh*scale)/2);c.scale(scale,scale);if(three)draw3(c);else draw2(c);c.restore();p.setColor(muted);p.setTextSize(18);c.drawText(run?(three?"CHẠY THỬ 3D":"CHẠY THỬ 2D"):(three?"3D VIEW":"2D SCENE"),12,24,p);if(run){p.setColor(Color.WHITE);p.setTextSize(20);String extraHud="";if(runtimeVars.containsKey("Gold"))extraHud+="   Gold: "+(int)Math.round(runtimeVars.getOrDefault("Gold",0d));if(runtimeVars.containsKey("Level"))extraHud+="   Level: "+(int)Math.round(runtimeVars.getOrDefault("Level",1d));c.drawText("Score: "+runtimeScore+"   Lives: "+runtimeLives+(findPlayer()!=null?"   HP: "+(int)Math.round(runtimeObjectHealthValue(findPlayer())):"")+extraHud,12,52,p);if(runtimeGameOver){p.setColor(Color.RED);p.setTextSize(38);c.drawText("GAME OVER",Math.max(12,getWidth()/2f-105),getHeight()/2f,p);}postInvalidateDelayed(40);}}
+        @Override protected void onDraw(Canvas c){super.onDraw(c);c.drawColor(Color.rgb(20,33,51));if(run)tickRuntime();int sw=sceneWidth(),sh=sceneHeight();boolean renderThree=run?project.optString("dimension","2D").equalsIgnoreCase("3D"):three;float scale=Math.min(getWidth()/(float)sw,getHeight()/(float)sh);if(scale<=0)return;c.save();c.translate((getWidth()-sw*scale)/2,(getHeight()-sh*scale)/2);c.scale(scale,scale);if(renderThree)draw3(c);else draw2(c);c.restore();p.setColor(muted);p.setTextSize(18);c.drawText(run?(renderThree?"CHẠY THỬ 3D":"CHẠY THỬ 2D"):(three?"3D VIEW":"2D SCENE"),12,24,p);if(run){p.setColor(Color.WHITE);p.setTextSize(20);String extraHud="";if(runtimeVars.containsKey("Gold"))extraHud+="   Gold: "+(int)Math.round(runtimeVars.getOrDefault("Gold",0d));if(runtimeVars.containsKey("Level"))extraHud+="   Level: "+(int)Math.round(runtimeVars.getOrDefault("Level",1d));c.drawText("Score: "+runtimeScore+"   Lives: "+runtimeLives+(findPlayer()!=null?"   HP: "+(int)Math.round(runtimeObjectHealthValue(findPlayer())):"")+extraHud,12,52,p);if(runtimeGameOver){p.setColor(Color.RED);p.setTextSize(38);c.drawText("GAME OVER",Math.max(12,getWidth()/2f-105),getHeight()/2f,p);}postInvalidateDelayed(40);}}
         void draw2(Canvas c){
             int sw=sceneWidth(),sh=sceneHeight();
             p.setColor(sceneBackgroundColor());p.setAlpha(255);c.drawRect(0,0,sw,sh,p);
